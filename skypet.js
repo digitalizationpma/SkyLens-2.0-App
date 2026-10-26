@@ -140,7 +140,7 @@
             pinpin: [{ L: [158, 0], R: [158, 0] }, { L: [164, 0], R: [164, 0] }],
             orbi: [{ L: [172, 0], R: [172, 0] }, { L: [178, 0], R: [178, 0] }] }, ant: [-3, 3],
       body: { dur: 0.14, dir: 'alternate', f: ['translate(-1.5px,0)', 'translate(1.5px,-2px)'] }, fx: 'bang' },
-    { k: 'tidur', label: 'Tidur', when: 'Di luar jam kerja 05.00–21.00 atau perekaman dijeda.',
+    { k: 'tidur', label: 'Tidur', when: 'Di luar jam kerja atau perekaman dijeda.',
       chat: 'Sudah di luar jam kerja. Sampai besok pagi.',
       face: 'sleep', dur: 2.4, dir: 'alternate', front: true,
       fr: { rovi: [{ L: { t: 'tuckL' }, R: { t: 'tuckR' } }, { L: { t: 'tuckL', dy: 1.5 }, R: { t: 'tuckR', dy: 1.5 } }],

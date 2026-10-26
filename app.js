@@ -253,6 +253,27 @@ let AREA = {zona: [], outlet: []};    // data area sales yg sedang login
 let zonaMap = {};
 let zonaList = [];
 let JKS_PETAK = {};
+/* petak kuning (C) disembunyikan secara default: sales cukup fokus ke merah (A) + oranye (B) + petak JKS hari ini; kuning bisa dinyalakan. */
+let tampilC = false; try{ tampilC = localStorage.getItem('sl2_tampilC') === '1'; }catch(e){}
+const WARNA_PRIO = {1: '#c0392b', 2: '#e67e22', 3: '#f1c40f'};   // sama dengan dashboard: A merah, B oranye, C kuning
+function jksPetakSegar(){
+  const kunci = tglKunci(jksHariD()) + '|' + (sesi ? sesi.depot : '') + '|' + (typeof mgrSales === 'string' ? mgrSales : '') + '|' + (OUTLET ? OUTLET.length : 0);
+  if(jksPetakSegar.k !== kunci){ jksPetakSegar.k = kunci; JKS_PETAK = jksPerPetak(); }
+  return JKS_PETAK;
+}
+function zonaTampil(z){
+  if(tampilC) return true;
+  if(sesi && sesi.depot === 'TESTING') return true;
+  if(z[23] === 1 || z[23] === 2) return true;
+  return ((jksPetakSegar() || {})[keyDari(z[2], z[3])] || 0) > 0;
+}
+function jumlahKuningTersembunyi(){ return tampilC ? 0 : zonaList.filter(z => !zonaTampil(z)).length; }
+function setTampilC(v){
+  tampilC = !!v; try{ localStorage.setItem('sl2_tampilC', v ? '1' : '0'); }catch(e){}
+  if(el_ber()) { const e = el_ber(); e.dataset.sig = ''; } renderBeranda();
+  petaSemuaPerbarui.sig = ''; if(tabAktif === 'peta') petaSemuaPerbarui(true);
+}
+function el_ber(){ return $('berandaBody'); }
 let manualList = [];
 let zonaState = {mode: 'memuat', pesan: ''};
 let gridSet = new Set();              // "key:r:c" (server + lokal)
@@ -377,7 +398,7 @@ async function siapkan(){
   const c = persetujuan();
   if(peranSesi()){ try{ nat().berhenti(); }catch(e){} }
   else {
-    if(!c){ tampil('scrSetuju'); return; }
+    if(!c || !c.setuju){ tampil('scrSetuju'); return; }   // tidak ada tombol menolak; jawaban 'tidak' lama (versi sebelumnya) ditanya ulang
     if(c.setuju){
       if(!inf.lokasi){ bukaSetelan(true); return; }
       mulaiTracking();
@@ -932,24 +953,24 @@ function jksInfoHtml(){
   try{
     const g = jksHariD(); if(!sesi || peranSesi() || g.getDay() === 0) return '';
     const jh = jksHariIni(g); if(!jh) return '';
-    const nP = (zonaList || []).filter(z => (JKS_PETAK || {})[keyDari(z[2], z[3])]).length;
+    const nP = (zonaList || []).filter(z => (jksPetakSegar() || {})[keyDari(z[2], z[3])]).length;
     const kode = '<b>' + esc(jh.kode_jks) + '</b>';
     let t, cls = '';
-    if(nP > 0) { t = 'JKS hari ini ' + kode + ': ' + jh.jumlah_toko + ' toko. Petak yang berisi tokomu ditandai <b style="color:#B84A00">★ oranye</b> dan ada di urutan atas, pilih yang searah rutemu.'; cls = ' on'; }
+    if(nP > 0) { t = 'JKS hari ini ' + kode + ': ' + jh.jumlah_toko + ' toko. Petak yang berisi tokomu hari ini diberi warna oranye berkilau dengan tulisan <b style="color:#B84A00">JKS hari ini</b> dan ada di urutan atas, pilih yang searah rutemu.'; cls = ' on'; }
     else if(jh.jumlah_toko > 0) t = 'JKS hari ini ' + kode + ': ' + jh.jumlah_toko + ' toko, tapi tidak ada di petak zona kamu. Pilih petak yang paling dekat dengan rutemu.';
     else t = 'JKS hari ini ' + kode + ': tidak ada toko di rutemu. Petak boleh dipilih bebas.';
     return '<div class="jksInfo' + cls + '">' + t + '</div>';
   }catch(e){ return ''; }
 }
-function zonaCardHtml(z, idx){
+function zonaCardHtml(z, idx, no){
   const key = keyDari(z[2], z[3]), n = progresZona(key);
   const pr = NAMA_PRIO[z[23]] || '-';
   let jarak = '', here = false;
   if(lastPos){ const d = jarakKeTepiZona(z, lastPos.lat, lastPos.lon); here = d < 1; jarak = here ? 'kamu di sini' : fmtJarak(d); }
   const N = nKotak(key), jk = (JKS_PETAK || {})[key] || 0;
   return '<button type="button" class="card zonecard' + (here ? ' here' : '') + (jk ? ' jksHari' : '') + '" onclick="bukaZonaIdx(' + idx + ')">' +
-    '<span class="row" style="justify-content:space-between;align-items:flex-start;width:100%"><span class="col" style="gap:2px"><b style="font-size:16px">' + esc(z[11] || ('Petak ' + key)) + '</b>' +
-    '<span class="muted" style="font-size:13px">' + esc(kecZona(z)) + (jarak ? ' · ' + jarak : '') + '</span>' + (jk ? '<span class="jksChip">★ JKS hari ini · ' + jk + ' toko</span>' : '') + '</span><span class="prio p' + (pr === '-' ? 'X' : pr) + '">Prioritas ' + pr + '</span></span>' +
+    '<span class="row" style="justify-content:space-between;align-items:flex-start;width:100%;gap:10px"><span class="zNo">' + no + '</span><span class="col" style="gap:2px;flex:1;min-width:0"><b style="font-size:16px">' + esc(z[11] || ('Petak ' + key)) + '</b>' +
+    '<span class="muted" style="font-size:13px">' + esc(kecZona(z)) + (jarak ? ' · ' + jarak : '') + '</span>' + (jk ? '<span class="jksChip">JKS hari ini · ' + jk + ' toko</span>' : '') + '</span><span class="prio p' + (pr === '-' ? 'X' : pr) + '">Prioritas ' + pr + '</span></span>' +
     '<span class="row" style="width:100%;gap:10px">' + segKotakHtml(n, N) + '<span class="mono" style="font-size:13px;white-space:nowrap">' + teksKotak(n, N) + '</span></span></button>';
 }
 /* ---- bilah RBM/BM/ASS: pilih depo + filter sales ---- */
@@ -977,7 +998,13 @@ async function gantiDepoMgr(dep){
   if(mapAll){ try{ mapAll.remove(); }catch(e){} mapAll = null; allLayers = []; allMe = null; allSel = -1; allFirstFit = false; }
   segarkanLayarAktif();
 }
-function gantiSalesMgr(k){ mgrSales = k || ''; tokoAllOn = !!k || tokoAllOn; segarkanLayarAktif(); }
+function gantiSalesMgr(k){
+  mgrSales = k || ''; tokoAllOn = !!k || tokoAllOn;
+  /* pilih sales -> petak yang tampil = petak milik sales itu (sama dengan yang dilihat sales); "Semua sales" -> petak pilot depo */
+  try{ zonaList = mgrSales ? petakOtomatis(mgrSales) : (AREA.zona || []).filter(z => z[24] === 1); }catch(e){}
+  allSel = -1; petaSemuaPerbarui.sig = ''; if(typeof jlSiapkanIndeks === 'function') jlSiapkanIndeks();
+  segarkanLayarAktif();
+}
 function renderBeranda(){
   const el = $('berandaBody'); if(!el || !sesi) return;
   const sapa = (() => { const j = wibDate().getUTCHours(); return j < 11 ? 'Selamat pagi' : (j < 15 ? 'Selamat siang' : (j < 18 ? 'Selamat sore' : 'Selamat malam')); })();
@@ -989,22 +1016,25 @@ function renderBeranda(){
   h += mgrBarHtml();
   if(obSisa > 0) h += '<div class="banner warn"><span>' + obSisa + ' data (temuan/sisir) menunggu terkirim — otomatis dicoba lagi.</span><button onclick="kirimSemuaSekarang()">Kirim</button></div>';
   h += heroHtml();
-  const nz = zonaList.length;
-  let kotak = 0, kotakN = 0; zonaList.forEach(z => { kotak += progresZona(keyDari(z[2], z[3])); kotakN += nKotak(keyDari(z[2], z[3])); });
-  h += '<div class="row" style="justify-content:space-between"><h2 style="font-size:18px;font-weight:800">Zona kamu' + (nz ? ' <span class="muted" style="font-size:13px;font-weight:600">· ' + kotak + '/' + kotakN + ' kotak</span>' : '') + '</h2>' +
-    (nz ? '<button type="button" onclick="bukaTab(\'peta\')" style="border:0;background:none;font-size:13px;font-weight:700;color:var(--orange-ink)">Lihat di peta</button>' : '') + '</div>';
+  jksPetakSegar();
+  const tampilIdx = zonaList.map((z, i) => i).filter(i => zonaTampil(zonaList[i]));
+  const nz = tampilIdx.length, sembunyi = jumlahKuningTersembunyi();
+  let kotak = 0, kotakN = 0; tampilIdx.forEach(i => { const z = zonaList[i]; kotak += progresZona(keyDari(z[2], z[3])); kotakN += nKotak(keyDari(z[2], z[3])); });
+  h += '<div class="row" style="justify-content:space-between;align-items:flex-end;gap:10px"><div class="col" style="gap:1px"><h2 style="font-size:18px;font-weight:800">Zona kamu</h2>' + (nz ? '<span class="muted" style="font-size:13px;font-weight:600">' + nz + ' petak · ' + kotak + '/' + kotakN + ' kotak</span>' : '') + '</div>' +
+    (nz ? '<button type="button" onclick="bukaTab(\'peta\')" style="border:0;background:none;font-size:13px;font-weight:700;color:var(--orange-ink);white-space:nowrap">Lihat di peta</button>' : '') + '</div>';
   if(zonaState.mode === 'memuat') h += '<div class="empty">Memuat zona…</div>';
   else if(zonaState.mode === 'galat') h += '<div class="empty">' + esc(zonaState.pesan) + '<br><br><button class="btn gh sm" onclick="muatDaftarZona()">Coba lagi</button></div>';
   else if(zonaState.mode === 'kosong') h += '<div class="empty">Belum ada zona yang ditugaskan ke kamu. Hubungi BM/koordinator.</div>';
   else {
     if(zonaState.offline) h += '<div class="banner warn"><span>Tidak ada sinyal — menampilkan daftar terakhir yang tersimpan.</span></div>';
-    JKS_PETAK = jksPerPetak();
     h += jksInfoHtml();
-    const idx = zonaList.map((z, i) => i);
+    const idx = tampilIdx.slice();
     const jkn = i => JKS_PETAK[keyDari(zonaList[i][2], zonaList[i][3])] || 0;
     if(lastPos) idx.sort((a, b) => jarakKeTepiZona(zonaList[a], lastPos.lat, lastPos.lon) - jarakKeTepiZona(zonaList[b], lastPos.lat, lastPos.lon));
     idx.sort((a, b) => (jkn(b) > 0) - (jkn(a) > 0));   // petak berisi toko JKS hari ini naik ke atas (urutan jarak tetap sebagai pembeda)
-    h += idx.map(i => zonaCardHtml(zonaList[i], i)).join('');
+    h += idx.map((i, u) => zonaCardHtml(zonaList[i], i, u + 1)).join('');
+    if(sembunyi > 0) h += '<button type="button" class="btn gh sm" onclick="setTampilC(true)">Tampilkan ' + sembunyi + ' petak kuning (Prioritas C)</button>';
+    else if(tampilC && zonaList.some(z => z[23] !== 1 && z[23] !== 2)) h += '<button type="button" class="btn gh sm" onclick="setTampilC(false)">Sembunyikan petak kuning (Prioritas C)</button>';
     manualList.forEach((a, i) => {
       h += '<button type="button" class="card zonecard" style="border-left:4px solid #0d6efd" onclick="bukaAreaManualIdx(' + i + ')"><span class="row" style="justify-content:space-between;width:100%"><b style="font-size:16px">' + esc(a.name || 'Area manual') + '</b><span class="prio man">Manual</span></span><span class="muted" style="font-size:13px">' + esc(a.reason || 'Area gambar bebas dari dashboard') + '</span></button>';
     });
@@ -1082,7 +1112,7 @@ function renderAkun(){
   h += '<section class="card" style="padding:16px;border-radius:20px;display:flex;flex-direction:column;gap:8px"><b style="font-size:15px">Perekaman jejak</b>' +
     '<span style="font-size:13px">Status: <b>' + (inf.tracking ? 'AKTIF' : 'MATI') + '</b>' + (inf.alasan_berhenti ? ' · ' + esc(inf.alasan_berhenti) : '') + '</span>' +
     '<span style="font-size:13px">Persetujuan lokasi: <b>' + (c ? (c.setuju ? 'Diizinkan' : 'Tidak diizinkan') : 'Belum dijawab') + '</b></span>' +
-    '<div class="bar-actions">' + ((!inf.tracking && c && c.setuju) ? '<button class="btn gh sm" onclick="mulaiTracking();segarkanLayarAktif()">Mulai perekaman</button>' : '') + '<button class="btn gh sm" onclick="tampil(\'scrSetuju\')">Ubah jawaban</button></div></section>';
+    '<div class="bar-actions">' + ((!inf.tracking && c && c.setuju) ? '<button class="btn gh sm" onclick="mulaiTracking();segarkanLayarAktif()">Mulai perekaman</button>' : '') + '</div></section>';
   if(g && g.dbhz != null){
     const sinyal = g.dbhz >= 0 ? g.dbhz + ' dB-Hz ' + (g.dbhz >= 25 ? '(kuat)' : '(lemah — di dalam gedung?)') : 'belum diketahui';
     h += '<section class="card" style="padding:16px;border-radius:20px;display:flex;flex-direction:column;gap:6px"><b style="font-size:15px">Sinyal GPS</b>' +
@@ -1234,6 +1264,8 @@ function petaSemuaTampil(){
     mapAll = L.map('mapAll', {zoomControl: false, attributionControl: false}).setView(c, 12);
     mapAll.on('popupopen', e => ajusPopup(mapAll, e.popup));
     siapkanPane(mapAll);
+    const lbZoom = () => { const c = mapAll.getContainer(); if(c) c.classList.toggle('lbMati', mapAll.getZoom() < 14); };   // label petak hanya muncul saat sudah didekati (peta ringan & tidak bertumpuk)
+    mapAll.on('zoomend', lbZoom); lbZoom();
     const hy = buatHybrid().addTo(mapAll); pasangBasemapToggle(mapAll, hy);
     if(typeof jlLegenda === 'function') jlLegenda(mapAll);
   }
@@ -1242,17 +1274,20 @@ function petaSemuaTampil(){
 }
 function petaSemuaPerbarui(fit){
   if(!mapAll || tabAktif !== 'peta') return;
-  const sig = zonaList.map(z => keyDari(z[2], z[3]) + ':' + progresZona(keyDari(z[2], z[3]))).join(',') + '|' + manualList.length + '|' + allSel + '|' + (typeof JL !== 'undefined' ? JL.ver : 0);
+  jksPetakSegar();
+  const sig = zonaList.map(z => zonaTampil(z) ? keyDari(z[2], z[3]) + ':' + progresZona(keyDari(z[2], z[3])) : '').join(',') + '|' + manualList.length + '|' + allSel + '|' + tampilC + '|' + (typeof JL !== 'undefined' ? JL.ver : 0);
   if(petaSemuaPerbarui.sig !== sig){
     petaSemuaPerbarui.sig = sig;
     allLayers.forEach(l => mapAll.removeLayer(l)); allLayers = [];
     const bounds = [];
     zonaList.forEach((z, i) => {
-      const b = batasZona(z), sel = i === allSel, n = progresZona(keyDari(z[2], z[3]));
-      const r = L.rectangle([[b.lat0, b.lon0], [b.lat1, b.lon1]], {color: sel ? '#1C212D' : '#FE7A1B', weight: sel ? 4 : 3, fillColor: '#FE7A1B', fillOpacity: sel ? 0.28 : 0.2, pane: 'petakPane'}).addTo(mapAll);
+      if(!zonaTampil(z) && i !== allSel) return;   // hanya petak kerja sales ini (A/B + JKS hari ini; C kalau dinyalakan)
+      const key = keyDari(z[2], z[3]), b = batasZona(z), sel = i === allSel, n = progresZona(key), w = WARNA_PRIO[z[23]] || '#9aa3b2', jk = (JKS_PETAK || {})[key] || 0;
+      /* warna petak = warna dashboard: A merah, B oranye, C kuning */
+      const r = L.rectangle([[b.lat0, b.lon0], [b.lat1, b.lon1]], {color: sel ? '#1C212D' : w, weight: sel ? 4 : (jk ? 3.5 : 2.5), fillColor: w, fillOpacity: sel ? 0.34 : 0.24, pane: 'petakPane'}).addTo(mapAll);
       r.on('click', () => { allSel = i; petaSemuaPerbarui(); petaSemuaSheet(); });
-      const lb = L.marker([b.lat1, b.lon0], {interactive: false, icon: L.divIcon({className: '', iconSize: null, iconAnchor: [-6, -6],
-        html: '<span style="font-size:11px;font-weight:800;background:' + (sel ? '#1C212D' : '#FE7A1B') + ';color:' + (sel ? '#fff' : '#1C212D') + ';border-radius:6px;padding:3px 7px;white-space:nowrap">' + esc(z[11] || 'Petak') + ' · ' + teksKotak(n, nKotak(keyDari(z[2], z[3]))) + '</span>'})}).addTo(mapAll);
+      const lb = L.marker([b.lat1, b.lon0], {interactive: false, icon: L.divIcon({className: 'lbPetak', iconSize: null, iconAnchor: [-6, -6],
+        html: '<span style="font-size:11px;font-weight:800;background:' + (sel ? '#1C212D' : '#fff') + ';color:' + (sel ? '#fff' : '#1C212D') + ';border-radius:6px;padding:3px 7px;white-space:nowrap;border-left:4px solid ' + w + ';box-shadow:0 1px 4px rgba(0,0,0,.25)">' + (jk ? 'JKS · ' : '') + esc(z[11] || 'Petak') + ' · ' + teksKotak(n, nKotak(key)) + '</span>'})}).addTo(mapAll);
       allLayers.push(r, lb); bounds.push([b.lat0, b.lon0], [b.lat1, b.lon1]);
     });
     if(typeof JL !== 'undefined'){ JL.lapAll = null; if(allSel >= 0 && zonaList[allSel]){ const g = jlGambarRuas(mapAll, keyDari(zonaList[allSel][2], zonaList[allSel][3])); if(g){ JL.lapAll = g; allLayers.push(g); } } }
@@ -1272,8 +1307,10 @@ function tokoAllDaftar(){ return (OUTLET || []).filter(tokoMilikSaya); }
 function tokoAllTgl(){
   const el = $('tokoTgl'); if(!el) return;
   const saya = tokoAllDaftar(), nSed = saya.filter(tokoSedotan).length;
-  const h = '<button type="button" aria-pressed="' + tokoAllOn + '" onclick="tokoAllSet()"><i class="d" style="background:#e08e2b"></i>Toko AS-IS · ' + saya.length + '</button>' +
+  let h = '<button type="button" aria-pressed="' + tokoAllOn + '" onclick="tokoAllSet()"><i class="d" style="background:#e08e2b"></i>Toko AS-IS · ' + saya.length + '</button>' +
     (tokoAllOn && nSed ? '<button type="button" aria-pressed="true" style="cursor:default" tabindex="-1"><i class="h"></i>Order &lt;200rb · ' + nSed + '</button>' : '');
+  const nC = zonaList.filter(z => z[23] === 3).length;
+  if(nC) h += '<button type="button" aria-pressed="' + tampilC + '" onclick="setTampilC(' + (!tampilC) + ')"><i class="d" style="background:#f1c40f"></i>Petak kuning · ' + nC + '</button>';
   if(el.dataset.sig !== h){ el.innerHTML = h; el.dataset.sig = h; }
 }
 function tokoAllSet(){
@@ -1304,7 +1341,7 @@ function petaSemuaSheet(){
   if(sh.__selSig !== allSel){ sh.__selSig = allSel; if(sheetLipat.allSheet) sheetBuka('allSheet'); }
   let h = '<i class="grab"></i>';
   if(allSel < 0 || !zonaList[allSel]){
-    h += '<div class="col" style="gap:2px;padding:4px 0 2px"><b style="font-size:16px">' + (zonaList.length ? 'Ketuk kotak oranye untuk memilih zona' : 'Belum ada zona di peta') + '</b><span class="muted" style="font-size:13px">' + (zonaList.length ? zonaList.length + ' zona ditugaskan ke kamu' : 'Zona akan muncul setelah penugasan dari atasan') + '</span></div>';
+    h += '<div class="col" style="gap:2px;padding:4px 0 2px"><b style="font-size:16px">' + (zonaList.length ? 'Ketuk petak berwarna untuk memilih zona' : 'Belum ada zona di peta') + '</b><span class="muted" style="font-size:13px">' + (zonaList.length ? (zonaList.length - jumlahKuningTersembunyi()) + ' petak ditugaskan · merah A, oranye B, kuning C' : 'Zona akan muncul setelah penugasan dari atasan') + '</span></div>';
   } else {
     const z = zonaList[allSel], key = keyDari(z[2], z[3]), n = progresZona(key), pr = NAMA_PRIO[z[23]] || '-';
     let d = null, here = false; if(lastPos){ d = jarakKeTepiZona(z, lastPos.lat, lastPos.lon); here = d < 1; }

@@ -184,9 +184,9 @@ function jlTandaiKotak(key, r, c, lat, lon, t, diam){
 /* --- ringkasan jalan besar --- */
 function jlNamaBesar(rd){
   if(rd[2]) return (typeof namaJalanRapi === 'function') ? namaJalanRapi(rd[2]) : rd[2];
-  if(rd[1] === 'tertiary') return 'Jalan kabupaten tanpa nama';
-  if(rd[1] === 'primary' || rd[1] === 'secondary' || rd[1] === 'trunk' || rd[1] === 'motorway') return 'Jalan provinsi/nasional tanpa nama';
-  return 'Jalan besar tanpa nama';
+  if(rd[1] === 'tertiary') return 'Jalan kabupaten (belum ada nama di peta)';
+  if(rd[1] === 'primary' || rd[1] === 'secondary' || rd[1] === 'trunk' || rd[1] === 'motorway') return 'Jalan provinsi/nasional (belum ada nama di peta)';
+  return 'Jalan besar (belum ada nama di peta)';
 }
 function jlRingkasBesar(keys){   // keys: array key petak
   let tot = 0, mkn = 0, semua = 0, semuaMkn = 0; const grp = {};
@@ -194,12 +194,14 @@ function jlRingkasBesar(keys){   // keys: array key petak
     const d = JL.done.has(q.id);
     semua += q.len; if(d) semuaMkn += q.len;
     if(q.kat !== 'B' && q.kat !== 'Q') return;
+    const rd = JL.data.roads[q.ri];
+    if(rd[1] === 'motorway' || /\btol\b/i.test(rd[2] || '')) return;   // jalan tol tidak bisa disusuri sales motor
     tot += q.len; if(d) mkn += q.len;
-    const rd = JL.data.roads[q.ri], nm = jlNamaBesar(rd);
-    const g = grp[nm] || (grp[nm] = {nama: nm, tot: 0, mkn: 0, cek: false});
+    const nm = jlNamaBesar(rd);
+    const g = grp[nm] || (grp[nm] = {nama: nm, tot: 0, mkn: 0, cek: false, tanpaNama: !rd[2]});
     g.tot += q.len; if(d) g.mkn += q.len; if(q.kat === 'Q') g.cek = true;
   }));
-  const daftar = Object.values(grp).filter(g => g.tot >= 40).sort((a, b) => b.tot - a.tot);
+  const daftar = Object.values(grp).filter(g => g.tot >= 40).sort((a, b) => (a.tanpaNama - b.tanpaNama) || (b.tot - a.tot));   // jalan bernama di atas, yang tanpa nama di bawah
   return {tot: tot, mkn: mkn, semua: semua, semuaMkn: semuaMkn, daftar: daftar};
 }
 function jlKm(m){ return (m / 1000).toLocaleString('id-ID', {minimumFractionDigits: 1, maximumFractionDigits: 1}); }
@@ -232,12 +234,16 @@ function jlMisi(){
   if(rb.tot <= 0) return {id: 'jalan', kunci: false, done: true, p: 1, pendek: 'Zona kamu tidak dilewati jalan besar', tag: '✓',
     teks: 'Zona tugasmu tidak dilewati jalan besar. Fokus susuri jalan kampung dan gang ya!'};
   const p = Math.min(1, rb.mkn / rb.tot), done = p >= 0.999;
-  const belum = rb.daftar.filter(g => g.mkn / g.tot < JL_BESAR_SELESAI).slice(0, 2).map(g => '<b>' + esc(g.nama) + '</b>');
+  /* sebut hanya jalan yang PUNYA nama; jalan tanpa nama di peta (data OSM/Overture memang kosong) tidak disebut satu per satu */
+  const belumSemua = rb.daftar.filter(g => g.mkn / g.tot < JL_BESAR_SELESAI);
+  const belum = belumSemua.filter(g => !g.tanpaNama).slice(0, 2).map(g => '<b>' + esc(g.nama) + '</b>');
+  const sisaTanpaNama = belumSemua.some(g => g.tanpaNama);
   return {id: 'jalan', kunci: false, done: done, p: p,
     pendek: 'Jalan besar ' + jlKm(rb.mkn) + '/' + jlKm(rb.tot) + ' km dilewati',
     tag: done ? '✓' : Math.round(p * 100) + '%',
     teks: 'Toko besar biasanya ada di jalan besar. Di zona tugasmu ada <b>' + jlKm(rb.tot) + ' km</b> jalan besar, baru <b>' + jlKm(rb.mkn) + ' km</b> yang kamu lewati' +
-      (belum.length ? '. Yuk susuri ' + belum.join(' & ') + '!' : ' — mantap, hampir semua sudah!')};
+      (belum.length ? '. Yuk susuri ' + belum.join(' & ') + (sisaTanpaNama ? ' dan jalan besar lain yang belum berwarna tosca di peta' : '') + '!'
+        : (sisaTanpaNama ? '. Yuk susuri jalan besar yang belum berwarna tosca di peta!' : ' — mantap, hampir semua sudah!'))};
 }
 
 /* --- gambar di peta --- */
