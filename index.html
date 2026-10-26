@@ -336,6 +336,100 @@ svg .seg{transform-box:view-box;transform-origin:0 0}
 .prospekPin .qm{position:absolute;right:-2px;top:-2px;width:34px;height:34px;border-radius:50%;background:var(--navy);color:#fff;font:800 20px/34px system-ui,sans-serif;text-align:center;box-shadow:0 4px 12px rgba(31,44,79,.3);animation:qmBob 1.6s ease-in-out infinite}
 @keyframes pinMikir{0%,100%{transform:rotate(-3deg)}50%{transform:rotate(3deg) translateY(-2px)}}
 @keyframes qmBob{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-4px) scale(1.06)}}
+.jksChip{display:inline-block;align-self:flex-start;margin-top:3px;padding:2px 8px;border-radius:999px;background:#FFF1E6;color:#B84A00;font-size:11.5px;font-weight:800}
+</style>
+<style id="patch20251025">
+/* ikon pin di judul */
+.pinIco{width:16px;height:16px;flex:none;display:inline-block;vertical-align:-3px}
+.mpT{display:inline-flex;align-items:center;gap:6px}
+/* chip kata semangat di kepala panel Pinpin */
+#petSheet .chipw{max-width:calc(100% - 100px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#petSheet .chipw #petWho{overflow:hidden;text-overflow:ellipsis}
+.sambutLagi{align-self:center;border:0;background:transparent;color:#B9480A;font:inherit;font-size:12.5px;font-weight:800;padding:8px 10px;min-height:40px;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+/* toko AS-IS di tab Peta */
+.tokoTgl{position:absolute;left:14px;top:74px;z-index:940;display:flex;gap:6px;flex-wrap:wrap;pointer-events:none}
+.tokoTgl button{pointer-events:auto;border:0;border-radius:999px;background:#fff;color:#1C212D;font:inherit;font-size:12.5px;font-weight:800;padding:8px 12px;min-height:38px;display:inline-flex;align-items:center;gap:7px;box-shadow:0 4px 14px rgba(28,33,45,.18);cursor:pointer}
+.tokoTgl button[aria-pressed="false"]{color:#5B6478;background:#F4F6F9}
+.tokoTgl i.d{width:11px;height:11px;border-radius:50%;flex:none;border:2px solid #fff;box-shadow:0 0 0 1px rgba(28,33,45,.25)}
+.tokoTgl i.h{width:11px;height:11px;border-radius:50%;flex:none;background:#1FA35B;border:2px solid #fff;box-shadow:0 0 0 1px rgba(28,33,45,.25)}
+.spSedot{background:#E3F6EB;color:#13683A}
+.spNote{font-size:11.5px;color:#9A3A06;background:#FFF7F0;border-radius:10px;padding:7px 9px;line-height:1.35}
+.spAct{margin-top:2px;border:0;border-radius:12px;background:#1F2C4F;color:#fff;font:inherit;font-size:13px;font-weight:800;min-height:40px;cursor:pointer}
+.spGrid{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
+/* sambutan Pinpin */
+#sambut{position:absolute;inset:0;z-index:2600;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;overflow:hidden;background:rgba(15,20,32,0);transition:background .35s;touch-action:manipulation}
+#sambut.on{background:rgba(15,20,32,.55)}
+#sambut .sbFly{position:absolute;left:50%;top:13%;width:190px;height:190px;margin-left:-95px;transform:translate(260px,-420px) rotate(28deg) scale(.45);opacity:0}
+#sambut.on .sbFly{animation:sbIn 1.15s cubic-bezier(.25,.9,.3,1.12) forwards}
+#sambut .sbFly .sbBob{width:100%;height:100%}
+#sambut.landed .sbFly .sbBob{animation:sbBob 2.4s ease-in-out infinite}
+#sambut .sbFly svg{width:100%;height:100%;overflow:visible;display:block;filter:drop-shadow(0 12px 18px rgba(0,0,0,.28))}
+#sambut .sbTrail{position:absolute;left:50%;top:13%;width:190px;height:190px;margin-left:-95px;pointer-events:none;opacity:0}
+#sambut.on .sbTrail{animation:sbTrail 1s ease-out forwards}
+#sambut .sbTrail i{position:absolute;height:5px;border-radius:3px;background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,194,74,.95));transform-origin:100% 50%}
+#sambut .sbCard{position:relative;width:calc(100% - 24px);max-width:420px;margin:0 12px calc(14px + env(safe-area-inset-bottom,0px));background:#fff;border-radius:26px;padding:18px 18px 16px;box-shadow:0 18px 40px rgba(0,0,0,.3);display:flex;flex-direction:column;gap:12px;transform:translateY(120%);transition:transform .45s cubic-bezier(.2,1.1,.3,1)}
+#sambut.landed .sbCard{transform:none}
+#sambut .sbCard::before{content:"";position:absolute;left:50%;top:-9px;width:18px;height:18px;margin-left:-9px;background:#fff;transform:rotate(45deg);border-radius:3px}
+#sambut .sbHead{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+#sambut .sbDate{font-size:12px;font-weight:800;color:#1F2C4F;background:#EEF1F7;border-radius:999px;padding:5px 10px}
+#sambut .sbJks{font-size:12px;font-weight:800;color:#9A3A06;background:#FFF0E4;border-radius:999px;padding:5px 10px;font-variant-numeric:tabular-nums}
+#sambut .sbMsg{font-size:15.5px;line-height:1.55;color:#1C212D;font-weight:600;min-height:12.4em}
+#sambut .sbMsg b{font-weight:800;color:#B9480A}
+#sambut .sbMsg .cur{display:inline-block;width:2px;height:1.05em;background:#FE7A1B;vertical-align:-2px;margin-left:1px;animation:sbCur .8s steps(1) infinite}
+#sambut .sbToko{display:flex;flex-direction:column;gap:6px;opacity:0;transition:opacity .3s}
+#sambut .sbToko.show{opacity:1}
+#sambut .sbToko .lb{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#5B6478}
+#sambut .sbToko .ls{display:flex;flex-wrap:wrap;gap:6px}
+#sambut .sbToko .ls span{font-size:12px;font-weight:700;border-radius:999px;padding:4px 10px;background:#F4F6F9;border:1px solid #E3E7EF;color:#1C212D}
+#sambut .sbGo{border:0;border-radius:16px;background:#FE7A1B;color:#1C212D;font:inherit;font-size:16px;font-weight:800;min-height:54px;cursor:pointer;box-shadow:0 8px 18px rgba(254,122,27,.35)}
+#sambut .sbSkip{position:absolute;right:14px;top:calc(14px + env(safe-area-inset-top,0px));border:0;border-radius:999px;background:rgba(255,255,255,.18);color:#fff;font:inherit;font-size:12.5px;font-weight:800;padding:8px 12px;min-height:36px;cursor:pointer;opacity:0;transition:opacity .3s .6s}
+#sambut.on .sbSkip{opacity:1}
+#sambut.out{background:rgba(15,20,32,0)}
+#sambut.out .sbCard{transform:translateY(120%)}
+#sambut.out .sbFly{transition:transform .7s cubic-bezier(.5,0,.3,1),opacity .7s ease-in;animation:none;opacity:0}
+@keyframes sbIn{0%{opacity:0;transform:translate(260px,-420px) rotate(28deg) scale(.45)}20%{opacity:1}62%{transform:translate(-30px,24px) rotate(-10deg) scale(1.06)}82%{transform:translate(8px,-6px) rotate(4deg) scale(.98)}100%{opacity:1;transform:none}}
+@keyframes sbTrail{0%{opacity:0;transform:translate(220px,-360px)}20%{opacity:1}70%{opacity:.8;transform:translate(-10px,10px)}100%{opacity:0;transform:none}}
+@keyframes sbBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+@keyframes sbCur{50%{opacity:0}}
+@media (prefers-reduced-motion:reduce){#sambut .sbFly,#sambut.on .sbFly{animation:none;opacity:1;transform:none}#sambut .sbTrail{display:none}}
+</style>
+<style id="patch20251025b">
+/* popup toko ringkas */
+.spHead{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.spHead .spNama{margin:0}
+.spKode{font-family:ui-monospace,"IBM Plex Mono",monospace;font-size:11.5px;font-weight:600;color:var(--muted,#5B6478)}
+.spKpi{display:grid;grid-template-columns:auto auto auto;justify-content:space-between;gap:10px;padding-top:8px;border-top:1px solid var(--line,#E7EBF2);margin-right:-28px}
+.spKpi div{display:flex;flex-direction:column;gap:1px;min-width:0}
+.spKpi span{font-size:10.5px;font-weight:700;color:var(--muted,#5B6478);line-height:1.2;white-space:nowrap}
+.spKpi b{font-size:14px;font-weight:800;white-space:nowrap}
+.spCiri{font-size:12px;font-weight:800;color:#13683A;background:#E3F6EB;border-radius:10px;padding:7px 10px;display:flex;align-items:center;gap:7px}
+.spCiri i{width:9px;height:9px;border-radius:50%;background:#1FA35B;border:2px solid #fff;box-shadow:0 0 0 1px rgba(28,33,45,.25);flex:none}
+/* kartu zona ringkas */
+.stat.cp{padding:7px 10px;gap:0;border-radius:12px}
+.stat.cp span{font-size:11px;white-space:nowrap}
+.stat.cp b{font-size:15px;line-height:1.25}
+.banner.cp{padding:7px 10px;font-size:12.5px;gap:8px;white-space:nowrap}
+/* sambutan 3 tahap */
+#sambut .sbCard{gap:10px}
+#sambut .sbMsg{min-height:0;font-size:16.5px;line-height:1.5}
+#sambut .sbBody{min-height:150px;display:flex;flex-direction:column;gap:10px;justify-content:flex-start}
+#sambut .sbStep{display:flex;align-items:center;justify-content:space-between;gap:10px}
+#sambut .sbDots{display:flex;gap:6px}
+#sambut .sbDots i{width:8px;height:8px;border-radius:4px;background:#E3E7EF;transition:width .25s,background .25s}
+#sambut .sbDots i.on{width:22px;background:#FE7A1B}
+#sambut .sbDots i.done{background:#1F2C4F}
+#sambut .sbNo{font-size:12px;font-weight:800;color:#5B6478}
+#sambut .sbNav{display:flex;gap:8px}
+#sambut .sbPrev{flex:1;border:1.5px solid #E3E7EF;border-radius:16px;background:#fff;color:#1C212D;font:inherit;font-size:15px;font-weight:800;min-height:54px;cursor:pointer}
+#sambut .sbPrev[hidden]{display:none}
+#sambut .sbGo{flex:2}
+#sambut .sbToko{opacity:1}
+#sambut .sbToko .ls span b{font-family:ui-monospace,"IBM Plex Mono",monospace;font-weight:600;color:#5B6478;margin-left:5px;font-size:11px}
+#sambut .sbPop{animation:sbPop .45s cubic-bezier(.3,1.6,.5,1)}
+@keyframes sbPop{0%{transform:scale(1)}30%{transform:scale(1.12,.88)}60%{transform:translateY(-16px) scale(.94,1.08)}100%{transform:none}}
+#sambut .sbFade{animation:sbFade .3s ease-out}
+@keyframes sbFade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+#sambut.out .sbFly{transition:none;opacity:1}
 </style>
 </head>
 <body>
@@ -399,6 +493,7 @@ svg .seg{transform-box:view-box;transform-origin:0 0}
         <input id="qAll" class="in" style="border:0;min-height:44px;padding:0;font-size:15px" placeholder="Cari zona atau toko" autocomplete="off">
       </div>
       <div id="allRes" style="display:none;position:absolute;left:14px;right:14px;top:70px;z-index:950;background:#fff;border-radius:18px;box-shadow:0 8px 24px rgba(28,33,45,.2);padding:6px 12px;max-height:55%;overflow-y:auto"></div>
+      <div class="tokoTgl" id="tokoTgl"></div>
       <div class="bsheet" id="allSheet"></div>
     </div>
     <div id="tabRiwayat" class="tab"><div class="scrollY"><div class="pad" id="riwayatBody" style="padding-top:20px"></div></div></div>
@@ -448,7 +543,7 @@ svg .seg{transform-box:view-box;transform-origin:0 0}
     <div class="pgrab"></div>
     <div class="shead">
       <button type="button" class="round" id="petClose" aria-label="Tutup panel"><svg class="ico" viewBox="0 0 24 24" style="width:18px;height:18px"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
-      <span class="chipw"><svg viewBox="0 0 24 24" style="width:14px;height:14px" aria-hidden="true"><path d="M12 2C16.4 2 19 5 19 8.8 19 13 14.4 15.6 12 22 9.6 15.6 5 13 5 8.8 5 5 7.6 2 12 2Z" fill="#FE7A1B"/></svg><span id="petWho">Pinpin</span></span>
+      <span class="chipw"><svg class="pinIco" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C16.4 2 19 5 19 8.8 19 13 14.4 15.6 12 22 9.6 15.6 5 13 5 8.8 5 5 7.6 2 12 2Z" fill="#FE7A1B"/><circle cx="12" cy="8.9" r="2.9" fill="#fff"/></svg><span id="petWho">Pinpin</span></span>
       <span class="round" aria-hidden="true" style="background:transparent"></span>
     </div>
     <div class="sbody" id="petBody">
@@ -459,8 +554,9 @@ svg .seg{transform-box:view-box;transform-origin:0 0}
       <div class="say" id="pSay" aria-live="polite"></div>
       <div class="big"><button type="button" class="bigHit" id="bigHit"><div class="hopper" id="hopper"></div></button><span class="tapme">ketuk Pinpin</span></div>
       <div class="pprog"><div class="pbar" id="pBarWrap" role="img"><i id="pBarFill"></i><b id="pBarTxt"></b></div><span class="pcap" id="pBarCap"></span></div>
-      <div class="pcard"><h3>Misi dari Pinpin <span id="pMisiCount"></span></h3><div id="pMissions"></div></div>
+      <div class="pcard"><h3><span class="mpT"><svg class="pinIco" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C16.4 2 19 5 19 8.8 19 13 14.4 15.6 12 22 9.6 15.6 5 13 5 8.8 5 5 7.6 2 12 2Z" fill="#FE7A1B"/><circle cx="12" cy="8.9" r="2.9" fill="#fff"/></svg>Misi dari Pinpin</span> <span id="pMisiCount"></span></h3><div id="pMissions"></div></div>
       <div class="pcard"><h3>Lencana streak <span>dapat NOO tiap hari kerja</span></h3><div class="badges" id="pBadges"></div></div>
+      <button type="button" class="sambutLagi" id="btnSambutLagi">Dengar sambutan Pinpin hari ini lagi</button>
     </div>
     <div class="confetti" id="pConfetti"></div>
   </section>

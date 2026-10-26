@@ -6,7 +6,7 @@
    ============================================================ */
 const SUPABASE_URL = 'https://bgvdrinvblanlaykydit.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_EMHLQqIuGbFaCBUYkV5yVw_X_yR_aKZ';
-const APP_VERSI = '1.2.0';
+const APP_VERSI = '1.2.1';
 const S = 0.01;       // ukuran petak (derajat)
 const GRID_N = 4;     // 4x4 = 16 kotak per petak
 const NAMA_PRIO = ['-', 'A', 'B', 'C'];
@@ -73,10 +73,11 @@ function labelWaktu(ms){ return (wibYmd(ms) === wibYmd() ? 'Hari ini' : tglPende
 
 /* ---------- nama sales: buang awalan kode divisi (AEPDA-, GDKDA - ...) dan rapikan huruf ---------- */
 function namaBersih(n){
-  let s = String(n || '').trim().replace(/^(AEPDA|GDKDA)\b\s*-?\s*/i, '').trim();
+  let s = String(n || '').trim().replace(/^(AEPDA|GDKDA|GLKDA|RBM|BM|ASS)\b\s*-?\s*/i, '').trim();
   if(!s) s = String(n || '').trim();
   return s.toLowerCase().replace(/(^|[\s.'-])([a-z])/g, (m, a, b) => a + b.toUpperCase());
 }
+function peranNama(n){ const m = /^(RBM|BM|ASS)\b\s*-/i.exec(String(n || '').trim()); return m ? m[1].toUpperCase() : ''; }
 function namaDepan(n){ const b = namaBersih(n).split(/\s+/); return (b[0] && b[0].length <= 2 && b[1]) ? b[0] + ' ' + b[1] : (b[0] || ''); }
 function inisial(n){ const b = namaBersih(n).replace(/[^A-Za-z\s]/g, '').split(/\s+/).filter(Boolean); return ((b[0] || '?')[0] + (b[1] ? b[1][0] : (b[0] || '')[1] || '')).toUpperCase(); }
 
@@ -247,6 +248,7 @@ let depotAktif = '';
 let AREA = {zona: [], outlet: []};    // data area sales yg sedang login
 let zonaMap = {};
 let zonaList = [];
+let JKS_PETAK = {};
 let manualList = [];
 let zonaState = {mode: 'memuat', pesan: ''};
 let gridSet = new Set();              // "key:r:c" (server + lokal)
@@ -312,9 +314,9 @@ async function pilihDepot(dep){
   let roster = [];
   try{ roster = await muatRoster(dep); } finally { $('depotLoading').style.display = 'none'; $('depotInput').disabled = false; }
   if($('depotInput').value !== dep) return;   // pengguna sudah ganti area lagi
-  roster = roster.filter(s => !/^vacant$/i.test(namaBersih(s[1]))).sort((a, b) => namaBersih(a[1]).localeCompare(namaBersih(b[1])));
+  roster = roster.filter(s => !/^vacant$/i.test(namaBersih(s[1]))).sort((a, b) => ((peranNama(a[1]) ? 1 : 0) - (peranNama(b[1]) ? 1 : 0)) || namaBersih(a[1]).localeCompare(namaBersih(b[1])));
   const sel = $('kodeInput'); sel.innerHTML = '<option value="">Pilih namamu…</option>';
-  roster.forEach(s => { const o = document.createElement('option'); o.value = s[0]; o.textContent = namaBersih(s[1]) + ' · ' + s[0]; o.dataset.nama = s[1]; sel.appendChild(o); });
+  roster.forEach(s => { const o = document.createElement('option'); o.value = s[0]; o.textContent = (peranNama(s[1]) ? '[' + peranNama(s[1]) + '] ' : '') + namaBersih(s[1]) + (peranNama(s[1]) ? '' : ' · ' + s[0]); o.dataset.nama = s[1]; sel.appendChild(o); });
   sel.disabled = false; $('fldNama').classList.remove('dis');
   if(!roster.length) toast('Belum ada nama sales untuk area ini. Hubungi admin.', 4000);
 }
@@ -375,6 +377,7 @@ async function siapkan(){
   mulaiPoll();
   tampil('scrMain');
   bukaTab(tabAktif || 'beranda');
+  setTimeout(() => { try{ if(window.pinpinSambut) pinpinSambut(false); }catch(e){} }, 500);
   hitungOutbox().then(() => { prosesOutbox(); segarkanLayarAktif(); });
   muatRingkasan(true);
   await muatDaftarZona();
@@ -585,7 +588,6 @@ function hitungMisi(){
    DATA AREA + DAFTAR ZONA
    ============================================================ */
 async function muatDataArea(dep){
-  if(dep === 'TESTING'){ AREA = {zona: [], outlet: []}; zonaMap = {}; OUTLET = []; return; }
   try{
     const r = await fetch('data/' + dep.replace(/\s+/g, '_') + '.json');
     AREA = await r.json();
@@ -631,6 +633,7 @@ async function muatDaftarZona(){
   (tugas.grid || []).forEach(g => gridSet.add(g[0] + ':' + g[1] + ':' + g[2]));
   lsSet('sl2_grid_' + sesi.kode, Array.from(gridSet));
   zonaList = (tugas.petak || []).map(k => zonaDariKey(Number(k)));
+  if(sesi && sesi.depot === 'TESTING' && !zonaList.length) zonaList = Object.keys(zonaMap).map(k => zonaMap[k]).filter(Boolean);   // depo uji: kalau belum ditugaskan dari dashboard, 4 petak uji langsung tersedia
   manualList = tugas.area_manual || [];
   if(typeof jlSiapkanIndeks === 'function') jlSiapkanIndeks();
   zonaState = {mode: (!zonaList.length && !manualList.length && sesi.depot !== 'TESTING') ? 'kosong' : 'ok', offline: offline};
@@ -680,6 +683,136 @@ function statusRekamHtml(){
   return '<div class="card row" style="padding:12px 14px"><span style="width:12px;height:12px;border-radius:50%;background:' + dot + ';box-shadow:0 0 0 5px ' + halo + ';flex:none"></span>' +
     '<div class="col" style="flex:1;gap:1px"><b style="font-size:14px">' + judul + '</b><span class="muted" style="font-size:12px">' + ket + '</span></div>' + (aksi ? aksi.replace('<button', '<button style="border:0;border-radius:10px;padding:8px 12px;background:#EEF1F7;font-size:12.5px;font-weight:800;min-height:36px"') : '') + '</div>';
 }
+
+/* ===== Pinpin: kalimat harian (sambutan 6 variasi + 12 kata semangat), berganti tiap hari kerja ===== */
+const HARI_ID = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+const BULAN_ID = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+function tanggalPanjang(d){ return HARI_ID[d.getDay()] + ', ' + d.getDate() + ' ' + BULAN_ID[d.getMonth()] + ' ' + d.getFullYear(); }
+function tglKunci(d){ return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+/** Urutan hari kerja (Senin–Sabtu) sejak Senin 5 Jan 2026. Minggu ikut nomor hari kerja berikutnya. */
+function hariKerjaKe(d){
+  const a = Date.UTC(2026, 0, 5), b = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+  const hari = Math.floor((b - a) / 864e5), mg = Math.floor(hari / 7), sisa = ((hari % 7) + 7) % 7;
+  return mg * 6 + Math.min(sisa, 6);
+}
+const KATA_SEMANGAT = [
+  'Semangaatt cari NOO-nya!',
+  'Yuk gaskeun, Pinpin temenin cari NOO!',
+  'Satu NOO hari ini, streak aman!',
+  'Toko besar nungguin kamu, ayo!',
+  'Langkah kecil, NOO besar!',
+  'Hari ini pasti ada NOO, yakin!',
+  'Susuri jalan besar, cari toko pipa!',
+  'Pinpin percaya kamu bisa!',
+  'Gas pol, NOO udah nunggu!',
+  'Satu toko lagi, kamu pasti bisa!',
+  'Jangan kendor, NOO di depan mata!',
+  'Bareng Pinpin, cari NOO makin seru!'
+];
+function kataSemangatHariIni(d){ const n = hariKerjaKe(d || new Date()); return KATA_SEMANGAT[((n % 12) + 12) % 12]; }
+
+/* Data sambutan. NANTI diisi dari server (RPC usulan: sales_jks_hari_ini(p_kode)) setelah data JKS ditarik:
+   window.PINPIN_JKS = {kode_jks: 'R02 M2C24', toko_sedotan: [{kode, nama}], jalan_besar: ['Jl. ...', 'Jl. ...']}
+   Selama belum ada, demo memakai data contoh dari toko AS-IS milik sales (order < 200rb) + jalan contoh. */
+function jksContoh(d){
+  const milik = (OUTLET || []).filter(o => tokoMilikSaya(o));
+  const sed = milik.filter(tokoSedotan);
+  const hk = ((d.getDay() + 6) % 7);                       // Senin=0 … Sabtu=5, Minggu=6
+  const potong = sed.filter((o, i) => i % 6 === (hk % 6)).slice(0, 8);
+  const kode = 'R01 M2C' + (13 + hk % 6);
+  return {kode_jks: kode, toko_sedotan: potong.map(o => ({kode: o[6], nama: o[7]})), jalan_besar: ['Jl. Mayor Teddy', 'Jl. Subianto'], contoh: true};
+}
+/* ---- JKS hari ini, dihitung dari data toko di HP (o[14]=rute R01–R06 = Senin–Sabtu, o[15]=siklus M2C13 / M2C24 / M1) ----
+   Acuan siklus: Senin 26 Okt 2026 = R01 M2C13, lalu bergantian tiap minggu. Toko siklus M1 (sebulan sekali) belum dihitung. */
+const JKS_ACUAN = Date.UTC(2026, 9, 26);
+function jksSiklus(d){
+  const senin = new Date(d.getFullYear(), d.getMonth(), d.getDate() - ((d.getDay() + 6) % 7));
+  const mg = Math.round((Date.UTC(senin.getFullYear(), senin.getMonth(), senin.getDate()) - JKS_ACUAN) / (7 * 864e5));
+  return (((mg % 2) + 2) % 2) === 0 ? 'M2C13' : 'M2C24';
+}
+function jksNamaJalanBesar(maks){
+  try{
+    if(typeof JL === 'undefined' || !JL.data || !zonaList || !zonaList.length) return [];
+    const hit = {};
+    zonaList.forEach(z => {
+      const p = JL.data.petak[String(keyDari(z[2], z[3]))]; if(!p) return;
+      (p.r || []).forEach(i => { const r = JL.data.roads[i]; if(r && (r[0] === 'B') && r[2]) hit[r[2]] = (hit[r[2]] || 0) + 1; });
+    });
+    return Object.keys(hit).sort((a, b) => hit[b] - hit[a]).slice(0, maks || 3);
+  }catch(e){ return []; }
+}
+function jksHariIni(d){
+  if(!sesi || d.getDay() === 0) return null;
+  const milik = (OUTLET || []).filter(o => tokoMilikSaya(o) && o[14]);
+  if(!milik.length) return null;
+  const rute = 'R0' + d.getDay(), sik = jksSiklus(d);
+  const hariIni = milik.filter(o => o[14] === rute && o[15] === sik);
+  return {kode_jks: rute + ' ' + sik, toko_sedotan: hariIni.filter(tokoSedotan).map(o => ({kode: o[6], nama: o[7]})), jalan_besar: jksNamaJalanBesar(3), jumlah_toko: hariIni.length};
+}
+/* petak -> jumlah toko JKS hari ini milik saya (untuk urutan & penanda di kartu zona) */
+function jksPerPetak(){
+  const out = {};
+  try{
+    const d = wibDate(), g = new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+    if(!sesi || g.getDay() === 0) return out;
+    const rute = 'R0' + g.getDay(), sik = jksSiklus(g);
+    (OUTLET || []).forEach(o => {
+      if(!o[14] || o[14] !== rute || o[15] !== sik || !tokoMilikSaya(o)) return;
+      const k = keyDari(Math.floor(o[1] / S), Math.floor(o[0] / S));
+      out[k] = (out[k] || 0) + 1;
+    });
+  }catch(e){}
+  return out;
+}
+function dataSambutan(d){
+  if(window.PINPIN_JKS && window.PINPIN_JKS.kode_jks) return window.PINPIN_JKS;
+  return jksHariIni(d) || jksContoh(d);
+}
+
+function gabungJalan(a){ a = (a || []).filter(Boolean); if(!a.length) return ''; if(a.length === 1) return a[0]; return a.slice(0, -1).join(', ') + ' dan ' + a[a.length - 1]; }
+/* {N}=nama depan, {HARI}=nama hari, {JKS}=kode JKS, {S}=jumlah toko sedotan, {J}=jalan besar.
+   Tiap variasi = 3 tahap: [sapa + JKS, toko sedotan, misi]. Tahap yang datanya kosong dilewati. */
+const SAMBUTAN = [
+  /* Senin */
+  ['Haloo {N}! {SALAM}, selamat datang di SkyLens 2.0. Aku Pinpin yang akan temenin perjalanan kamu mencari NOO! Hari ini {TGL}, berarti JKS kamu hari ini <b>{JKS}</b>.',
+   'Nahh, di JKS kamu hari ini ada <b>{S} toko sedotan</b>, yaitu toko kecil yang order &lt;200rb, sedikit EC dan jarang ROA.',
+   'Misi kita hari ini menyusuri <b>{J}</b>. Prediksi Pinpin ada toko besar di sana buat gantiin toko sedotan tadi. Yukk langsung kita mulai! Pinpin temenin kok.'],
+  /* Selasa */
+  ['Hai {N}! {SALAM}, selamat datang di SkyLens 2.0. Aku Pinpin, temen seperjalananmu mencari NOO! Hari ini {TGL}, JKS kamu hari ini <b>{JKS}</b>.',
+   'Pinpin nemu <b>{S} toko sedotan</b> di JKS kamu: ordernya &lt;200rb, EC sedikit, jarang ROA.',
+   'Kita susuri <b>{J}</b> yuk! Feeling Pinpin ada toko besar di sana buat gantiin toko sedotan tadi. Gaskeun!'],
+  /* Rabu */
+  ['Halo halo {N}! {SALAM}, selamat datang di SkyLens 2.0. Aku Pinpin yang bakal nemenin kamu cari NOO! Hari ini {TGL}, waktunya JKS <b>{JKS}</b>.',
+   'Hmm, masih ada <b>{S} toko sedotan</b> di rute ini. Kecil, order &lt;200rb, EC tipis, jarang ROA.',
+   'Tugas kita: telusuri <b>{J}</b>, kemungkinan ada toko besar di sana jadi penggantinya. Pinpin ikut yaa!'],
+  /* Kamis */
+  ['Hei {N}! {SALAM}, selamat datang lagi di SkyLens 2.0. Pinpin siap nemenin kamu berburu NOO! Hari ini {TGL}, berarti kita jalan di JKS <b>{JKS}</b>.',
+   'Di JKS ini ada <b>{S} toko sedotan</b>: belanja &lt;200rb, sedikit EC, jarang ROA.',
+   'Misi hari ini ke <b>{J}</b>. Pinpin curiga ada toko besar nunggu kamu di sana buat gantiin toko sedotan. Yuk berangkat!'],
+  /* Jumat */
+  ['Yuhuu {N}! {SALAM}, selamat datang di SkyLens 2.0. Aku Pinpin, siap menemani perjalanan kamu mencari NOO! Hari ini {TGL}, JKS kamu hari ini <b>{JKS}</b>.',
+   'Ada <b>{S} toko sedotan</b> di JKS hari ini, yang order &lt;200rb, EC sedikit dan jarang ROA.',
+   'Pinpin udah tandain <b>{J}</b> buat kita susuri, ada toko besar di sana pengganti toko sedotan. Bareng Pinpin pasti bisa!'],
+  /* Sabtu */
+  ['Haii {N}! {SALAM}, selamat datang di SkyLens 2.0. Aku Pinpin yang akan jadi temen kamu mencari NOO! Hari ini {TGL}, kita di JKS <b>{JKS}</b>.',
+   'Pinpin catat <b>{S} toko sedotan</b> di rute kamu: toko kecil, order &lt;200rb, sedikit EC, jarang ROA.',
+   'Misi kita menyusuri <b>{J}</b>, prediksi Pinpin ada toko besar di situ buat gantiin mereka. Ayo mulai, Pinpin temenin terus!']
+];
+function salamWaktu(d){ const h = d.getHours(); return h < 11 ? 'Selamat pagii' : (h < 15 ? 'Selamat siang' : (h < 18 ? 'Selamat soree' : 'Selamat malam')); }
+const SAMBUTAN_TANPA_JALAN = 'Misi kita hari ini menyusuri jalan besar di petak kamu, biasanya ada toko besar di sana. Yukk mulai, Pinpin temenin!';
+const SAMBUTAN_TANPA_JKS = 'Haloo {N}! {SALAM}, selamat datang di SkyLens 2.0. Aku Pinpin yang akan temenin perjalanan kamu mencari NOO! Hari ini {TGL}.';
+function kalimatSambutan(d){
+  d = d || new Date();
+  const D = dataSambutan(d), v = SAMBUTAN[((hariKerjaKe(d) % 6) + 6) % 6];
+  const nama = sesi ? (typeof namaDepan === 'function' ? namaDepan(sesi.nama) : sesi.nama) : 'kamu';
+  const n = (D.toko_sedotan || []).length, jalan = gabungJalan(D.jalan_besar);
+  const isi = (t) => t.replace('{N}', esc(nama)).replace('{HARI}', HARI_ID[d.getDay()]).replace('{SALAM}', salamWaktu(d)).replace('{TGL}', esc(tanggalPanjang(d))).replace('{JKS}', esc(D.kode_jks || '-')).replace('{S}', n).replace('{J}', esc(jalan));
+  const langkah = [{html: isi(D.kode_jks ? v[0] : SAMBUTAN_TANPA_JKS), emo: 0, judul: 'Halo!'}];
+  if(n > 0) langkah.push({html: isi(v[1]), emo: 7, judul: 'Toko sedotan', toko: true});
+  langkah.push({html: jalan ? isi(v[2]) : SAMBUTAN_TANPA_JALAN, emo: 3, judul: 'Misi hari ini'});
+  return {langkah: langkah, data: D};
+}
+
 function heroHtml(){
   const rk = hitungRingkasan(), mm = hitungMisi();
   const pct = Math.min(100, Math.round(rk.hari_ini.noo / TARGET_NOO_HARIAN * 100));
@@ -687,7 +820,7 @@ function heroHtml(){
     '<div class="ms' + (m.kunci ? ' lock' : '') + '"><span class="ck' + (m.done ? ' done' : '') + '">' + (m.done ? ico('check', 'width:13px;height:13px;stroke-width:3') : (m.kunci ? ico('lock', 'width:12px;height:12px;stroke-width:2') : (i + 1))) + '</span>' +
     '<span class="tx">' + esc(m.pendek) + '</span><span class="tag">' + esc(m.tag) + '</span></div>').join('');
   return '<button type="button" class="hero" onclick="petBuka()" aria-label="Buka panel Pinpin">' +
-    '<div class="row" style="justify-content:space-between"><span style="font-size:13px;font-weight:700">Misi dari Pinpin</span>' +
+    '<div class="row" style="justify-content:space-between"><span class="mpT" style="font-size:13px;font-weight:700"><svg class="pinIco" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C16.4 2 19 5 19 8.8 19 13 14.4 15.6 12 22 9.6 15.6 5 13 5 8.8 5 5 7.6 2 12 2Z" fill="#fff"/><circle cx="12" cy="8.9" r="2.9" fill="#E8620C"/></svg>Misi dari Pinpin</span>' +
     '<span class="pill">' + flameSvg(rk.streak_nyala, '', 'width:11px;height:13px') + rk.streak + ' hari</span></div>' +
     '<div style="display:flex;align-items:baseline;gap:6px"><b style="font-size:38px;line-height:1">' + rk.hari_ini.noo + '</b><span style="font-size:16px;font-weight:600">/ ' + TARGET_NOO_HARIAN + ' NOO hari ini</span></div>' +
     '<div class="bar"><i style="width:' + pct + '%"></i></div>' +
@@ -700,10 +833,10 @@ function zonaCardHtml(z, idx){
   const pr = NAMA_PRIO[z[23]] || '-';
   let jarak = '', here = false;
   if(lastPos){ const d = jarakKeTepiZona(z, lastPos.lat, lastPos.lon); here = d < 1; jarak = here ? 'kamu di sini' : fmtJarak(d); }
-  const N = nKotak(key);
+  const N = nKotak(key), jk = (JKS_PETAK || {})[key] || 0;
   return '<button type="button" class="card zonecard' + (here ? ' here' : '') + '" onclick="bukaZonaIdx(' + idx + ')">' +
     '<span class="row" style="justify-content:space-between;align-items:flex-start;width:100%"><span class="col" style="gap:2px"><b style="font-size:16px">' + esc(z[11] || ('Petak ' + key)) + '</b>' +
-    '<span class="muted" style="font-size:13px">' + esc(kecZona(z)) + (jarak ? ' · ' + jarak : '') + '</span></span><span class="prio p' + (pr === '-' ? 'X' : pr) + '">Prioritas ' + pr + '</span></span>' +
+    '<span class="muted" style="font-size:13px">' + esc(kecZona(z)) + (jarak ? ' · ' + jarak : '') + '</span>' + (jk ? '<span class="jksChip">JKS hari ini · ' + jk + ' toko</span>' : '') + '</span><span class="prio p' + (pr === '-' ? 'X' : pr) + '">Prioritas ' + pr + '</span></span>' +
     '<span class="row" style="width:100%;gap:10px">' + segKotakHtml(n, N) + '<span class="mono" style="font-size:13px;white-space:nowrap">' + teksKotak(n, N) + '</span></span></button>';
 }
 function renderBeranda(){
@@ -725,8 +858,11 @@ function renderBeranda(){
   else if(zonaState.mode === 'kosong') h += '<div class="empty">Belum ada zona yang ditugaskan ke kamu. Hubungi BM/koordinator.</div>';
   else {
     if(zonaState.offline) h += '<div class="banner warn"><span>Tidak ada sinyal — menampilkan daftar terakhir yang tersimpan.</span></div>';
+    JKS_PETAK = jksPerPetak();
     const idx = zonaList.map((z, i) => i);
+    const jkn = i => JKS_PETAK[keyDari(zonaList[i][2], zonaList[i][3])] || 0;
     if(lastPos) idx.sort((a, b) => jarakKeTepiZona(zonaList[a], lastPos.lat, lastPos.lon) - jarakKeTepiZona(zonaList[b], lastPos.lat, lastPos.lon));
+    idx.sort((a, b) => (jkn(b) > 0) - (jkn(a) > 0));   // petak berisi toko JKS hari ini naik ke atas (urutan jarak tetap sebagai pembeda)
     h += idx.map(i => zonaCardHtml(zonaList[i], i)).join('');
     manualList.forEach((a, i) => {
       h += '<button type="button" class="card zonecard" style="border-left:4px solid #0d6efd" onclick="bukaAreaManualIdx(' + i + ')"><span class="row" style="justify-content:space-between;width:100%"><b style="font-size:16px">' + esc(a.name || 'Area manual') + '</b><span class="prio man">Manual</span></span><span class="muted" style="font-size:13px">' + esc(a.reason || 'Area gambar bebas dari dashboard') + '</span></button>';
@@ -816,7 +952,7 @@ function renderAkun(){
       '<span class="muted" style="font-size:12.5px">Sejak perekaman dimulai: ' + (g.terima || 0) + ' titik dipakai · ' + (g.buang || 0) + ' dibuang (akurasi jelek) · ' + (g.tahan || 0) + ' ditahan (melompat)</span></section>';
   }
   h += uiKartu();
-  h += '<div class="ver">SkyLens 2.0 v' + APP_VERSI + ' · ' + esc(inf.model || '') + (inf.android ? ' · Android API ' + inf.android : '') + '</div>';
+  h += '<div class="ver">SkyLens 2.0 v' + APP_VERSI + ' · tampilan diperbarui lewat internet ✓ · ' + esc(inf.model || '') + (inf.android ? ' · Android API ' + inf.android : '') + '</div>';
   if(el.dataset.sig !== h){
     const open = el.querySelector('details') && el.querySelector('details').open;
     const st = el.parentElement.scrollTop; el.innerHTML = h; el.dataset.sig = h; el.parentElement.scrollTop = st;
@@ -858,11 +994,17 @@ function arrowIcon(deg, besar){
   return L.divIcon({className: '', iconSize: [z, z], iconAnchor: [z/2, z/2],
     html: '<div style="width:' + z + 'px;height:' + z + 'px;transform:rotate(' + deg + 'deg);transition:transform 0.5s ease;"><svg viewBox="0 0 24 24" width="' + z + '" height="' + z + '"><path d="M12 2.5 L20.5 20.5 L12 16.2 L3.5 20.5 Z" fill="#1F2C4F" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg></div>'});
 }
+/* lapisan petak (kotak/zona) selalu di bawah marker toko, supaya toko tetap bisa diketuk */
+function siapkanPane(m){
+  var a = m.createPane('petakPane'); a.style.zIndex = 380;
+  var b = m.createPane('tokoPane'); b.style.zIndex = 650;
+}
 function petaSemuaTampil(){
   if(!$('tabPeta') || tabAktif !== 'peta') return;
   if(!mapAll){
     const c = (sesi && MANIFEST[sesi.depot]) ? MANIFEST[sesi.depot].center : [-7.2, 107.9];
     mapAll = L.map('mapAll', {zoomControl: false, attributionControl: false}).setView(c, 12);
+    siapkanPane(mapAll);
     const hy = buatHybrid().addTo(mapAll); pasangBasemapToggle(mapAll, hy);
     if(typeof jlLegenda === 'function') jlLegenda(mapAll);
   }
@@ -878,21 +1020,55 @@ function petaSemuaPerbarui(fit){
     const bounds = [];
     zonaList.forEach((z, i) => {
       const b = batasZona(z), sel = i === allSel, n = progresZona(keyDari(z[2], z[3]));
-      const r = L.rectangle([[b.lat0, b.lon0], [b.lat1, b.lon1]], {color: sel ? '#1C212D' : '#FE7A1B', weight: sel ? 4 : 3, fillColor: '#FE7A1B', fillOpacity: sel ? 0.28 : 0.2}).addTo(mapAll);
+      const r = L.rectangle([[b.lat0, b.lon0], [b.lat1, b.lon1]], {color: sel ? '#1C212D' : '#FE7A1B', weight: sel ? 4 : 3, fillColor: '#FE7A1B', fillOpacity: sel ? 0.28 : 0.2, pane: 'petakPane'}).addTo(mapAll);
       r.on('click', () => { allSel = i; petaSemuaPerbarui(); petaSemuaSheet(); });
       const lb = L.marker([b.lat1, b.lon0], {interactive: false, icon: L.divIcon({className: '', iconSize: null, iconAnchor: [-6, -6],
         html: '<span style="font-size:11px;font-weight:800;background:' + (sel ? '#1C212D' : '#FE7A1B') + ';color:' + (sel ? '#fff' : '#1C212D') + ';border-radius:6px;padding:3px 7px;white-space:nowrap">' + esc(z[11] || 'Petak') + ' · ' + teksKotak(n, nKotak(keyDari(z[2], z[3]))) + '</span>'})}).addTo(mapAll);
       allLayers.push(r, lb); bounds.push([b.lat0, b.lon0], [b.lat1, b.lon1]);
     });
     if(typeof JL !== 'undefined'){ JL.lapAll = null; if(allSel >= 0 && zonaList[allSel]){ const g = jlGambarRuas(mapAll, keyDari(zonaList[allSel][2], zonaList[allSel][3])); if(g){ JL.lapAll = g; allLayers.push(g); } } }
-    manualList.forEach(a => { try{ const g = L.geoJSON(a.geojson, {style: {color: '#0d6efd', weight: 2.5, fillColor: '#0d6efd', fillOpacity: 0.18}}).addTo(mapAll); allLayers.push(g); const bb = g.getBounds(); bounds.push([bb.getSouth(), bb.getWest()], [bb.getNorth(), bb.getEast()]); }catch(e){} });
+    manualList.forEach(a => { try{ const g = L.geoJSON(a.geojson, {pane: 'petakPane', style: {color: '#0d6efd', weight: 2.5, fillColor: '#0d6efd', fillOpacity: 0.18}}).addTo(mapAll); allLayers.push(g); const bb = g.getBounds(); bounds.push([bb.getSouth(), bb.getWest()], [bb.getNorth(), bb.getEast()]); }catch(e){} });
     if(bounds.length && (fit === true || !allFirstFit)){ allFirstFit = true; try{ mapAll.fitBounds(bounds, {padding: [40, 40], maxZoom: 16}); }catch(e){} }
   }
   if(lastPos){
     if(!allMe) allMe = L.marker([lastPos.lat, lastPos.lon], {icon: arrowIcon(lastPos.brg || 0, true), zIndexOffset: 800}).addTo(mapAll);
     else { allMe.setLatLng([lastPos.lat, lastPos.lon]); allMe.setIcon(arrowIcon(lastPos.brg || 0, true)); }
   }
+  tokoAllGambar();
   petaSemuaSheet();
+}
+let tokoAllLayer = null, tokoAllSig = '', tokoAllOn = false;
+try{ const t = JSON.parse(localStorage.getItem('sl2_tokoTgl2') || 'null'); if(t) tokoAllOn = !!t.on; }catch(e){}
+function tokoAllDaftar(){ return (OUTLET || []).filter(tokoMilikSaya); }
+function tokoAllTgl(){
+  const el = $('tokoTgl'); if(!el) return;
+  const saya = tokoAllDaftar(), nSed = saya.filter(tokoSedotan).length;
+  const h = '<button type="button" aria-pressed="' + tokoAllOn + '" onclick="tokoAllSet()"><i class="d" style="background:#e08e2b"></i>Toko AS-IS · ' + saya.length + '</button>' +
+    (tokoAllOn && nSed ? '<button type="button" aria-pressed="true" style="cursor:default" tabindex="-1"><i class="h"></i>Order &lt;200rb · ' + nSed + '</button>' : '');
+  if(el.dataset.sig !== h){ el.innerHTML = h; el.dataset.sig = h; }
+}
+function tokoAllSet(){
+  tokoAllOn = !tokoAllOn;
+  try{ localStorage.setItem('sl2_tokoTgl2', JSON.stringify({on: tokoAllOn})); }catch(e){}
+  tokoAllSig = ''; tokoAllGambar();
+}
+function tokoAllGambar(){
+  if(!mapAll) return;
+  tokoAllTgl();
+  const daftar = tokoAllOn ? tokoAllDaftar() : [];
+  const sig = tokoAllOn + '|' + daftar.length + '|' + (sesi ? sesi.kode : '');
+  if(sig === tokoAllSig) return; tokoAllSig = sig;
+  if(tokoAllLayer){ mapAll.removeLayer(tokoAllLayer); tokoAllLayer = null; }
+  if(!daftar.length) return;
+  tokoAllLayer = L.layerGroup();
+  daftar.forEach(o => {
+    const warna = o[2] === 'A' ? '#a53838' : (o[2] === 'B' ? '#e08e2b' : '#2a5a7a'), sed = tokoSedotan(o);
+    L.circleMarker([o[0], o[1]], sed
+      ? {radius: 6.5, color: '#fff', weight: 2, fillColor: '#1FA35B', fillOpacity: 1, pane: 'tokoPane'}
+      : {radius: 6, color: '#fff', weight: 1.4, fillColor: warna, fillOpacity: 0.95, pane: 'tokoPane'})
+      .bindPopup(popupToko(o), Object.assign({}, POPUP_OPT, {autoPanPaddingTopLeft: L.point(16, 140), autoPanPaddingBottomRight: L.point(16, 150)})).addTo(tokoAllLayer);
+  });
+  tokoAllLayer.addTo(mapAll);
 }
 function petaSemuaSheet(){
   const sh = $('allSheet'); if(!sh) return;
@@ -952,6 +1128,7 @@ function siapkanLayarPeta(){
 function buatPeta(zoom){
   if(map){ map.remove(); map = null; }
   map = L.map('map', {zoomControl: false, attributionControl: false}).setView([CENTER.lat, CENTER.lon], zoom);
+  siapkanPane(map);
   const hybrid = buatHybrid().addTo(map);
   pasangBasemapToggle(map, hybrid);
   if(typeof jlLegenda === 'function') jlLegenda(map);
@@ -963,7 +1140,7 @@ function buatPeta(zoom){
 }
 
 /* Popup toko bermerek SkyLens (kartu, bukan popup bawaan Leaflet) */
-const POPUP_OPT = {className: 'slPop', maxWidth: 270, minWidth: 210, closeButton: true};
+const POPUP_OPT = {className: 'slPop', maxWidth: 320, minWidth: 280, closeButton: true};
 /* padding autoPan dihitung saat popup dibuka: popup tidak boleh tertutup kartu atas / sheet bawah */
 Object.defineProperty(POPUP_OPT, 'autoPanPaddingTopLeft', {enumerable: true, get(){ return L.point(16, batasAtasPeta() + 12); }});
 Object.defineProperty(POPUP_OPT, 'autoPanPaddingBottomRight', {enumerable: true, get(){ return L.point(16, batasBawahPeta() + 58); }});
@@ -978,21 +1155,47 @@ function batasBawahPeta(){
   const host = document.getElementById(layarPetaAktif()); if(!host) return 130;
   const sh = host.querySelector('.bsheet'); return sh ? Math.ceil(sh.getBoundingClientRect().height) : 130;
 }
+function rupiahRingkas(v){
+  v = +v || 0; if(!v) return '—';
+  if(v >= 1e6) return 'Rp ' + (v / 1e6).toFixed(v >= 1e7 ? 0 : 1).replace('.', ',') + ' jt';
+  return 'Rp ' + Math.round(v / 1000) + ' rb';
+}
+const BATAS_SEDOTAN = 200000;   // order rata-rata/bln di bawah ini = calon toko sedotan (nanti + EC & ROA saat data JKS masuk)
+function tokoSedotan(o){ if(o[13] != null) return o[13] === 1 || o[13] === true;   // flag sudah dihitung di data (omset + EC + ROA P3M)
+  return (+o[4] || 0) > 0 && (+o[4]) < BATAS_SEDOTAN; }
+function tokoMilikSaya(o){ return !!(sesi && String(o[8] || '') === String(sesi.kode || '')); }
+/* EC & ROA P3M: kolom o[11] (EC) dan o[12] (ROA) diisi saat data JKS/KPI ditarik.
+   DEMO: selama kolomnya belum ada, pakai angka contoh yang stabil per toko. */
+function angka1(v){ return (Math.round(v * 10) / 10).toLocaleString('id-ID', {minimumFractionDigits: 1, maximumFractionDigits: 1}); }
+function kpiToko(o){
+  if(o[11] != null || o[12] != null) return {ec: o[11], roa: o[12], contoh: false};
+  let h = 0; const k = String(o[6] || o[7] || ''); for(let i = 0; i < k.length; i++) h = (h * 31 + k.charCodeAt(i)) >>> 0;
+  const om = +o[4] || 0, r = (h % 1000) / 1000;
+  const ec = Math.max(0.4, Math.min(8, om / 110000 + r * 0.8)), roa = Math.max(0.2, Math.min(4, om / 260000 + r * 0.6));
+  return {ec: ec, roa: roa, contoh: true};
+}
 function popupToko(o){
   const t = String(o[2] || '').toUpperCase(), warna = ({A: '#a53838', B: '#e08e2b', C: '#2a5a7a'})[o[2]] || '#7f8c8d';
+  const sed = tokoSedotan(o), milik = tokoMilikSaya(o), k = kpiToko(o);
   return '<div class="spB">' +
-    '<div class="spNama">' + esc(o[7] || '-') + '</div>' +
-    '<div class="spChips"><span class="spChip" style="background:' + warna + ';color:#fff">Tier ' + esc(t || '-') + '</span>' + (o[3] ? '<span class="spChip spTipe">' + esc(o[3]) + '</span>' : '') + '</div>' +
-    '<div class="spRow"><span class="spLab">Kode outlet</span><span class="spVal spMono">' + esc(o[6] || '-') + '</span></div>' +
-    '<div class="spRow"><span class="spLab">Sales rute reguler</span><span class="spVal">' + esc(o[9] || '—') + '</span></div>' +
+    '<div class="spHead"><span class="spNama">' + esc(o[7] || '-') + '</span><span class="spKode">' + esc(o[6] || '') + '</span></div>' +
+    '<div class="spChips"><span class="spChip" style="background:' + warna + ';color:#fff">Tier ' + esc(t || '-') + '</span>' + (o[3] ? '<span class="spChip spTipe">' + esc(o[3]) + '</span>' : '') +
+      (sed ? '<span class="spChip spSedot">Order &lt;200rb</span>' : '') + '</div>' +
+    '<div class="spKpi">' +
+      '<div><span>Avg. Omset P3M</span><b>' + rupiahRingkas(o[4]) + '</b></div>' +
+      '<div><span>Avg. EC P3M</span><b>' + (k.ec != null ? angka1(k.ec) : '—') + '</b></div>' +
+      '<div><span>Avg. ROA P3M</span><b>' + (k.roa != null ? angka1(k.roa) : '—') + '</b></div>' +
+    '</div>' +
+    (milik ? '' : '<div class="spKode" style="font-family:inherit">Sales: ' + esc(o[9] || '—') + '</div>') +
+    (sed ? '<div class="spCiri"><i></i>Ciri Toko Sedotan</div>' : '') +
   '</div>';
 }
 function gambarTokoDalam(){
   OUTLET.forEach(o => {
     const lat = o[0], lon = o[1];
     if(lat < LAT0 || lat > LAT1 || lon < LON0 || lon > LON1) return;
-    const warna = o[2] === 'A' ? '#a53838' : (o[2] === 'B' ? '#e08e2b' : '#2a5a7a');
-    L.circleMarker([lat, lon], {radius: 5, color: '#fff', weight: 1.2, fillColor: warna, fillOpacity: 0.9})
+    const warna = tokoSedotan(o) ? '#1FA35B' : (o[2] === 'A' ? '#a53838' : (o[2] === 'B' ? '#e08e2b' : '#2a5a7a'));
+    L.circleMarker([lat, lon], {radius: 5, color: '#fff', weight: 1.2, fillColor: warna, fillOpacity: 0.9, pane: 'tokoPane'})
       .bindPopup(popupToko(o), POPUP_OPT).addTo(map);
   });
 }
@@ -1006,7 +1209,7 @@ function buatKotak(){
   for(let r = 0; r < GRID_N; r++) for(let c = 0; c < GRID_N; c++){
     const clat0 = LAT0 + r*cellLat, clat1 = clat0 + cellLat, clon0 = LON0 + c*cellLon, clon1 = clon0 + cellLon;
     const aktif = (zonaAktif && !zonaAktif.manual && typeof jlKotakAktif === 'function') ? jlKotakAktif(zonaAktif.key_petak, r, c) : true;
-    const rect = L.rectangle([[clat0, clon0], [clat1, clon1]], {color: '#ffffff', weight: 1.5, fillColor: '#ffffff', fillOpacity: 0.1, opacity: 0, interactive: false});
+    const rect = L.rectangle([[clat0, clon0], [clat1, clon1]], {color: '#ffffff', weight: 1.5, fillColor: '#ffffff', fillOpacity: 0.1, opacity: 0, interactive: false, pane: 'petakPane'});
     const lb = L.marker([clat1, clon0], {interactive: false, icon: labelKotak(r, c, false)});
     cells.push({rect: rect, label: lb, r: r, c: c, visited: false, dwellMs: 0, aktif: aktif});
   }
@@ -1032,7 +1235,7 @@ function bukaZona(z){
   CENTER = {lat: (LAT0+LAT1)/2, lon: (LON0+LON1)/2};
   cellLon = (LON1-LON0)/GRID_N; cellLat = (LAT1-LAT0)/GRID_N;
   buatPeta(16);
-  L.rectangle([[LAT0, LON0], [LAT1, LON1]], {color: '#FE7A1B', weight: 3, fillColor: '#FE7A1B', fillOpacity: 0.1}).addTo(map);
+  L.rectangle([[LAT0, LON0], [LAT1, LON1]], {color: '#FE7A1B', weight: 3, fillColor: '#FE7A1B', fillOpacity: 0.1, pane: 'petakPane'}).addTo(map);
   if(typeof jlGambarRuas === 'function') JL.lapZona = jlGambarRuas(map, key);
   gambarTokoDalam();
   buatKotak(); tandaiKotakDariGrid();
@@ -1263,10 +1466,10 @@ function renderPosisi(paksa){
       $('navArrow').style.transform = 'rotate(' + Math.round(bearing(lastPos.lat, lastPos.lon, p.lat, p.lon)) + 'deg)';
     } else { $('disttext').textContent = '…'; $('etatext').textContent = 'mencari lokasi GPS…'; }
     const stat = z
-      ? '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px"><div class="stat"><span>Bangunan</span><b>' + (z[4] || 0).toLocaleString('id-ID') + '</b></div><div class="stat"><span>Toko terdaftar</span><b>' + (z[6] || 0) + '</b></div><div class="stat"><span>Disisir</span><b>' + teksKotak(n, N) + '</b></div></div>'
-      : '<div class="stat"><span>Disisir</span><b>' + teksKotak(n, N) + '</b></div>';
+      ? '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px"><div class="stat cp"><span>Bangunan</span><b>' + (z[4] || 0).toLocaleString('id-ID') + '</b></div><div class="stat cp"><span>Toko terdaftar</span><b>' + (z[6] || 0) + '</b></div><div class="stat cp"><span>Disisir</span><b>' + teksKotak(n, N) + '</b></div></div>'
+      : '<div class="stat cp"><span>Disisir</span><b>' + teksKotak(n, N) + '</b></div>';
     const sh = '<i class="grab"></i>' + stat +
-      '<div class="banner warn" style="justify-content:flex-start">' + ico('info', 'width:20px;height:20px;color:var(--orange-ink)') + '<span>Kotak sisir muncul otomatis begitu kamu masuk zona.</span></div>' +
+      '<div class="banner warn cp" style="justify-content:flex-start">' + ico('info', 'width:16px;height:16px;color:var(--orange-ink)') + '<span>Kotak sisir muncul saat masuk zona</span></div>' +
       '<button class="btn or" onclick="navigasiAktif()">' + ico('nav') + 'Arahkan dengan Google Maps</button>' +
       '<button class="btn gh sm" onclick="bukaWizard()">' + ico('plus') + 'Catat temuan di sini</button>';
     if(zs.dataset.sig !== sh){ zs.innerHTML = sh; zs.dataset.sig = sh; }

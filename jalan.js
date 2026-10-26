@@ -18,13 +18,29 @@ const JL_BUCKET = 0.0004;        // ukuran sel indeks spasial (±44 m)
 
 const JL = {data: null, depo: '', rp: {}, hash: null, done: new Set(), ver: 0, simpanT: null, legOpen: false};
 
+/* Data jalan besar (0,6–6,6 MB per depo) TIDAK ikut APK/paket tampilan: diunduh sekali dari GitHub Pages lalu disimpan di cache HP.
+   Urutan: cache HP (langsung dipakai) → internet → file bawaan APK (kalau ada). Cache diperbarui diam-diam di belakang. */
+const JL_URL = (typeof DATA_URL === 'string' ? DATA_URL : 'https://digitalizationpma.github.io/SkyLens-2.0-App/') + 'data/jalan/';
+async function jlAmbil(nama){
+  const url = JL_URL + nama + '.json';
+  let cache = null; try{ cache = ('caches' in window) ? await caches.open('sl2-jalan') : null; }catch(e){ cache = null; }
+  const dariNet = async () => {
+    const r = await fetch(url, {cache: 'no-cache'}); if(!r.ok) throw new Error('http ' + r.status);
+    if(cache){ try{ await cache.put(url, r.clone()); }catch(e){} }
+    return r.json();
+  };
+  if(cache){
+    try{ const c = await cache.match(url); if(c){ dariNet().catch(() => {}); return await c.json(); } }catch(e){}
+  }
+  try{ return await dariNet(); }catch(e){}
+  const r = await fetch('data/jalan/' + nama + '.json'); if(!r.ok) throw new Error('tidak ada');
+  return r.json();
+}
 async function jlMuat(dep){
   JL.data = null; JL.depo = dep || ''; JL.rp = {}; JL.pc = {}; JL.stC = {}; JL.hash = null; JL.ver++;
-  if(!dep || dep === 'TESTING') return;
+  if(!dep) return;
   try{
-    const r = await fetch('data/jalan/' + dep.replace(/\s+/g, '_') + '.json');
-    if(!r.ok) return;
-    const d = await r.json();
+    const d = await jlAmbil(dep.replace(/\s+/g, '_'));
     if(d && d.roads && d.petak) JL.data = d;
   }catch(e){ JL.data = null; }
   try{ JL.done = new Set(sesi ? lsGet('sl2_jl_' + sesi.kode, []) : []); }catch(e){ JL.done = new Set(); }

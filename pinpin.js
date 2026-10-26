@@ -79,7 +79,7 @@
 
   /* ---------- tampil / sembunyi ---------- */
   function petAtur(){
-    var perlu = !!(typeof sesi !== 'undefined' && sesi) && (screenAktif === 'scrMain' || screenAktif === 'scrPeta');
+    var perlu = !!(typeof sesi !== 'undefined' && sesi) && (screenAktif === 'scrMain' || screenAktif === 'scrPeta') && !document.getElementById('sambut');
     var tadi = pet.style.display;
     pet.style.display = perlu ? 'block' : 'none';
     if(!perlu){ tipEl.classList.remove('show'); if(panelBuka()) petTutup(); }
@@ -144,7 +144,7 @@
     try{ mm = hitungMisi(); }catch(e){ mm = {misi: [], selesai: 0}; }
     var T = (typeof TARGET_NOO_HARIAN === 'number') ? TARGET_NOO_HARIAN : 3, n = rk.hari_ini.noo;
     var nama = (typeof sesi !== 'undefined' && sesi && typeof namaDepan === 'function') ? namaDepan(sesi.nama) : '';
-    document.getElementById('petWho').textContent = nama ? 'Pinpin · ' + nama : 'Pinpin';
+    document.getElementById('petWho').textContent = 'SkyLens 2.0';
     document.getElementById('pStreak').textContent = rk.streak;
     document.getElementById('pTotal').textContent = rk.total_noo;
     document.getElementById('pStreakIco').innerHTML = flameSvg(rk.streak_nyala, 'flame' + (rk.streak_nyala ? '' : ' off'));
@@ -154,7 +154,7 @@
     document.getElementById('pBarFill').style.width = pct + '%';
     document.getElementById('pBarTxt').textContent = n + '/' + T + ' NOO hari ini';
     document.getElementById('pBarWrap').setAttribute('aria-label', n + ' dari ' + T + ' NOO hari ini');
-    document.getElementById('pBarCap').textContent = n >= T ? 'Target harian tercapai. Pinpin bangga!' : (h ? 'Kurang ' + (T - n) + ' NOO lagi untuk target harian' : 'Pinpin sedih karena belum ada NOO hari ini');
+    var _cap = document.getElementById('pBarCap'); _cap.style.display = (n < T && !h) ? 'none' : ''; _cap.textContent = n >= T ? 'Target harian tercapai. Pinpin bangga!' : (h ? 'Kurang ' + (T - n) + ' NOO lagi untuk target harian' : '');
 
     document.getElementById('pMissions').innerHTML = mm.misi.map(function(x, i){
       var tanda = x.done ? CEK : (x.kunci ? GEMBOK : '<b style="font-size:12px;color:#5E6678">' + (i + 1) + '</b>');
@@ -342,6 +342,102 @@
     var lencana = CATATAN.indexOf(rk.streak) >= 0 && pertama;
     petTip(lencana ? 'Lencana ' + rk.streak + ' hari terbuka! Mantap!' : (pertama ? 'Yeay, NOO pertama hari ini! Streak jadi ' + rk.streak + ' hari' : 'NOO ke-' + n + ' hari ini, mantap!'), 3800);
   }
+
+
+  /* ---------- sambutan Pinpin: intro 3 tahap (sekali per hari per sales; di demo setiap kali dibuka) ---------- */
+  var sbTyper = null, splashBeres = (window.parent === window), MODE_DEMO = (window.parent !== window);
+  window.addEventListener('message', function(ev){ var m = ev.data || {}; if(m.demo === 'splashSelesai'){ splashBeres = true; } });
+  function sambutKunci(){ return (typeof sesi !== 'undefined' && sesi) ? 'sl2_sambut_' + sesi.kode : null; }
+  function sambutTutup(){
+    var el = document.getElementById('sambut'); if(!el || el.classList.contains('out')) return;
+    clearInterval(sbTyper);
+    var fly = el.querySelector('.sbFly'), bob = el.querySelector('.sbBob');
+    // posisi tujuan = posisi pet mengambang
+    dariPecahan();
+    var ar = app.getBoundingClientRect(), r = fly.getBoundingClientRect();
+    fly.style.animation = 'none'; fly.style.opacity = '1'; fly.style.transform = 'none'; bob.style.animation = 'none';
+    var cx = r.left - ar.left + r.width / 2, cy = r.top - ar.top + r.height / 2;
+    var dx = (px + SZ / 2) - cx, dy = (py + SZ / 2) - cy, sk = SZ / r.width;
+    el.classList.add('out');
+    var selesai = function(){
+      if(el.parentNode) el.parentNode.removeChild(el);
+      pet.style.display = 'none'; petAtur();
+      try{ pet.querySelector('.hopW').animate([{transform: 'none'}, {transform: 'translateY(-14px) scale(.95,1.06)'}, {transform: 'scale(1.06,.94)'}, {transform: 'none'}], {duration: 520}); }catch(e){}
+    };
+    if(fly.animate){
+      var a = fly.animate([
+        {transform: 'translate(0,0) scale(1) rotate(0)'},
+        {transform: 'translate(' + (dx * 0.35) + 'px,' + (dy * 0.2 - 70) + 'px) scale(' + (0.75 + sk * 0.25) + ') rotate(-14deg)', offset: 0.45},
+        {transform: 'translate(' + dx + 'px,' + dy + 'px) scale(' + sk + ') rotate(0)'}
+      ], {duration: 850, easing: 'cubic-bezier(.45,0,.3,1)', fill: 'forwards'});
+      a.onfinish = selesai;
+    } else setTimeout(selesai, 300);
+  }
+  function sambutTampil(){
+    if(typeof kalimatSambutan !== 'function') return;
+    var lama = document.getElementById('sambut'); if(lama) lama.parentNode.removeChild(lama);
+    if(panelBuka()) petTutup();
+    var K = kalimatSambutan(new Date()), D = K.data, L3 = K.langkah, now = new Date(), idx = 0;
+    var el = document.createElement('div'); el.id = 'sambut'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'Sambutan Pinpin');
+    var trail = ''; for(var i = 0; i < 5; i++) trail += '<i style="width:' + (60 + i * 14) + 'px;right:' + (120 + i * 6) + 'px;top:' + (40 + i * 22) + 'px;transform:rotate(-38deg);opacity:' + (1 - i * .15) + '"></i>';
+    el.innerHTML = '<button type="button" class="sbSkip" aria-label="Lewati sambutan">Lewati</button>' +
+      '<div class="sbTrail">' + trail + '</div>' +
+      '<div class="sbFly"><div class="sbBob"><div class="sbPin"></div></div></div>' +
+      '<div class="sbCard"><div class="sbHead"><span class="sbDate">' + tanggalPanjang(now) + '</span>' + (D.kode_jks ? '<span class="sbJks">JKS ' + esk(D.kode_jks) + '</span>' : '') + '</div>' +
+      '<div class="sbBody" id="sbBody"></div>' +
+      '<div class="sbStep"><div class="sbDots" id="sbDots"></div><span class="sbNo" id="sbNo"></span></div>' +
+      '<div class="sbNav"><button type="button" class="sbPrev" id="sbPrev">Sebelumnya</button><button type="button" class="sbGo" id="sbGo">Lanjut</button></div></div>';
+    app.appendChild(el);
+    pet.style.display = 'none'; tipEl.classList.remove('show');
+    var pin = el.querySelector('.sbPin'), body = el.querySelector('#sbBody');
+    function render(animasi){
+      var st = L3[idx];
+      pin.innerHTML = M.svg('pinpin', st.emo);
+      if(animasi){ var b = el.querySelector('.sbBob'); b.classList.remove('sbPop'); void b.offsetWidth; b.classList.add('sbPop'); }
+      var toko = '';
+      if(st.toko){
+        var ts = (D.toko_sedotan || []);
+        toko = '<div class="sbToko"><div class="ls">' + ts.slice(0, 8).map(function(t){ return '<span>' + esk(t.nama || '-') + (t.kode ? '<b>' + esk(t.kode) + '</b>' : '') + '</span>'; }).join('') + (ts.length > 8 ? '<span>+' + (ts.length - 8) + ' lagi</span>' : '') + '</div>' + (D.contoh ? '<span class="lb">data contoh</span>' : '') + '</div>';
+      }
+      body.innerHTML = '<div class="sbMsg sbFade" id="sbMsg"></div>' + toko;
+      if(toko){ var tk = body.querySelector('.sbToko'); tk.style.opacity = 0; }
+      var msg = body.querySelector('#sbMsg'), full = st.html, pos = 0;
+      clearInterval(sbTyper);
+      var beres = function(){ clearInterval(sbTyper); msg.innerHTML = full; var t = body.querySelector('.sbToko'); if(t){ t.style.transition = 'opacity .3s'; t.style.opacity = 1; } };
+      sbTyper = setInterval(function(){
+        if(pos >= full.length){ beres(); return; }
+        if(full[pos] === '<'){ pos = full.indexOf('>', pos) + 1; } else if(full[pos] === '&'){ pos = full.indexOf(';', pos) + 1; } else pos += 2;
+        msg.innerHTML = full.slice(0, pos) + '<span class="cur"></span>';
+      }, 18);
+      msg.onclick = beres;
+      el.querySelector('#sbDots').innerHTML = L3.map(function(_, i){ return '<i class="' + (i === idx ? 'on' : (i < idx ? 'done' : '')) + '"></i>'; }).join('');
+      el.querySelector('#sbNo').textContent = (idx + 1) + ' / ' + L3.length;
+      el.querySelector('#sbPrev').hidden = idx === 0;
+      el.querySelector('#sbGo').textContent = idx === L3.length - 1 ? 'Yuk mulai!' : 'Lanjut';
+    }
+    render(false);
+    void el.offsetWidth; el.classList.add('on');
+    setTimeout(function(){ el.classList.add('landed'); }, 1050);
+    el.querySelector('#sbGo').addEventListener('click', function(){ if(idx < L3.length - 1){ idx++; render(true); } else sambutTutup(); });
+    el.querySelector('#sbPrev').addEventListener('click', function(){ if(idx > 0){ idx--; render(true); } });
+    el.querySelector('.sbSkip').addEventListener('click', sambutTutup);
+    try{ var k = sambutKunci(); if(k) localStorage.setItem(k, tglKunci(new Date())); }catch(e){}
+  }
+  /** Dipanggil app.js setelah masuk ke layar utama. Produksi: sekali per hari per sales. Demo (dalam bingkai HP): setiap kali dibuka. */
+  function pinpinSambut(paksa){
+    var k = sambutKunci(); if(!k) return;
+    var sudah = null; try{ sudah = localStorage.getItem(k); }catch(e){}
+    if(!paksa && !MODE_DEMO && sudah === tglKunci(new Date())) return;
+    var coba = 0;
+    (function tunggu(){
+      coba++;
+      var siap = splashBeres && screenAktif === 'scrMain' && document.visibilityState !== 'hidden';
+      if(siap || coba > 60) { if(screenAktif === 'scrMain') sambutTampil(); return; }
+      setTimeout(tunggu, 150);
+    })();
+  }
+  document.getElementById('btnSambutLagi').addEventListener('click', function(){ petTutup(); setTimeout(function(){ pinpinSambut(true); }, 380); });
+  window.pinpinSambut = pinpinSambut;
 
   window.petAtur = petAtur;
   window.petRender = petRender;
