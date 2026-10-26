@@ -77,6 +77,10 @@ function namaBersih(n){
   if(!s) s = String(n || '').trim();
   return s.toLowerCase().replace(/(^|[\s.'-])([a-z])/g, (m, a, b) => a + b.toUpperCase());
 }
+/* RBM/BM/ASS = mode LIHAT (tanpa perekaman GPS, melihat seluruh toko & petak pilot depo). RBM/BM bisa pindah depo sesuai MANAJER di config.js. */
+let mgrSales = '';
+function peranSesi(){ return sesi ? peranNama(sesi.nama) : ''; }
+function depotManajer(){ const m = (typeof MANAJER !== 'undefined' && sesi) ? MANAJER[sesi.kode] : null; return m ? m.depot : (sesi ? [sesi.depot] : []); }
 function peranNama(n){ const m = /^(RBM|BM|ASS)\b\s*-/i.exec(String(n || '').trim()); return m ? m[1].toUpperCase() : ''; }
 function namaDepan(n){ const b = namaBersih(n).split(/\s+/); return (b[0] && b[0].length <= 2 && b[1]) ? b[0] + ' ' + b[1] : (b[0] || ''); }
 function inisial(n){ const b = namaBersih(n).replace(/[^A-Za-z\s]/g, '').split(/\s+/).filter(Boolean); return ((b[0] || '?')[0] + (b[1] ? b[1][0] : (b[0] || '')[1] || '')).toUpperCase(); }
@@ -299,13 +303,19 @@ function resetNama(){
   const sel = $('kodeInput'); sel.innerHTML = '<option value="">Pilih area dulu</option>'; sel.disabled = true;
   $('fldNama').classList.add('dis'); $('fldNama').classList.remove('on'); $('btnMasuk').disabled = true;
 }
+function gabungManajer(dep, r){
+  if(typeof MANAJER === 'undefined') return r;
+  const ada = new Set(r.map(x => x[0]));
+  Object.keys(MANAJER).forEach(k => { if(!ada.has(k) && MANAJER[k].depot.indexOf(dep) >= 0) r.push([k, MANAJER[k].nama]); });
+  return r;
+}
 async function muatRoster(dep){
   const bawaan = (ROSTER[dep] || []).map(s => [String(s[0]), s[1]]);
   try{
     const data = await restGet('sales_roster?select=kode,nama&aktif=eq.true&depot=eq.' + encodeURIComponent(dep) + '&order=nama');
-    if(data && data.length){ const r = data.map(x => [String(x.kode), x.nama]); lsSet('sl2_roster_' + dep, r); return r; }
-  }catch(e){ const c = lsGet('sl2_roster_' + dep, null); if(c && c.length) return c; }
-  return bawaan;
+    if(data && data.length){ const r = data.map(x => [String(x.kode), x.nama]); lsSet('sl2_roster_' + dep, r); return gabungManajer(dep, r); }
+  }catch(e){ const c = lsGet('sl2_roster_' + dep, null); if(c && c.length) return gabungManajer(dep, c.slice()); }
+  return gabungManajer(dep, bawaan);
 }
 async function pilihDepot(dep){
   depotAktif = dep;
@@ -367,12 +377,15 @@ async function siapkan(){
   const jm = inf.jam_mulai >= 0 ? (String(inf.jam_mulai).padStart(2, '0') + '.00–' + String(inf.jam_selesai).padStart(2, '0') + '.00') : '24 jam';
   $('jamKerjaTxt').textContent = jm;
   const c = persetujuan();
-  if(!c){ tampil('scrSetuju'); return; }
-  if(c.setuju){
-    if(!inf.lokasi){ bukaSetelan(true); return; }
-    mulaiTracking();
-  } else {
-    try{ nat().berhenti(); }catch(e){}
+  if(peranSesi()){ try{ nat().berhenti(); }catch(e){} }
+  else {
+    if(!c){ tampil('scrSetuju'); return; }
+    if(c.setuju){
+      if(!inf.lokasi){ bukaSetelan(true); return; }
+      mulaiTracking();
+    } else {
+      try{ nat().berhenti(); }catch(e){}
+    }
   }
   mulaiPoll();
   tampil('scrMain');
@@ -383,7 +396,7 @@ async function siapkan(){
   await muatDaftarZona();
 }
 function mulaiTracking(){
-  if(!sesi) return;
+  if(!sesi || peranSesi()) return;
   const r = nat().mulai(sesi.kode, sesi.nama, sesi.depot);
   if(r !== 'ok') toast('Perekaman belum jalan: ' + r, 4200);
   mulaiPoll();
@@ -549,6 +562,27 @@ function petakMisi(){
   }
   return zonaList[0];
 }
+/* Misi 1: tiap toko sedotan di JKS hari ini diganti satu temuan RT-L baru (target maks 10 per hari). */
+function misiGanti(){
+  try{
+    const g = jksHariD();
+    if(!sesi) return null;
+    if(g.getDay() === 0) return {id: 'ganti', kunci: true, pendek: 'Ganti toko sedotan dengan RT-L', tag: 'Libur', teks: 'Hari Minggu tidak ada JKS. Selamat istirahat, besok misi ini aktif lagi!'};
+    const jh = jksHariIni(g);
+    if(!jh) return {id: 'ganti', kunci: true, pendek: 'Ganti toko sedotan dengan RT-L', tag: 'JKS belum ada', teks: 'JKS kamu belum ada di data depo ini, jadi daftar toko sedotan belum bisa ditampilkan. Tetap cari RT-L di sekitarmu ya!'};
+    const sed = jh.toko_sedotan || [];
+    if(!sed.length) return {id: 'ganti', kunci: false, done: true, p: 1, pendek: 'JKS hari ini tanpa toko sedotan', tag: '✓', teks: 'Mantap, JKS kamu hari ini (' + esc(jh.kode_jks) + ') tidak punya toko sedotan. Tetap cari RT-L di sekitar rutemu ya!'};
+    const w = wibDate(), mulai = Date.UTC(w.getUTCFullYear(), w.getUTCMonth(), w.getUTCDate()) - 7 * 3600e3;
+    const target = Math.min(sed.length, 10);
+    const ada = temuanGabungan().filter(x => x.uk === 'RT-L' && x.st !== 'sudah_dicover' && x.t >= mulai).length;
+    const done = ada >= target, p = Math.min(1, ada / target);
+    const nama = sed.slice(0, 3).map(x => '<b>' + esc(String(x.nama || x.kode).replace(/,\s*(TK|TOKO)$/i, '')) + '</b>').join(', ');
+    return {id: 'ganti', kunci: false, done: done, p: p,
+      pendek: 'RT-L pengganti ' + Math.min(ada, target) + '/' + target + ' (' + sed.length + ' toko sedotan di JKS hari ini)',
+      tag: done ? '✓' : Math.round(p * 100) + '%',
+      teks: 'Di JKS hari ini ada <b>' + sed.length + ' toko sedotan</b>, antara lain ' + nama + '. Targetmu <b>' + target + ' toko RT-L baru</b> di sekitar rute untuk menggantikannya. Sudah ketemu ' + Math.min(ada, target) + (done ? ' — target tercapai, mantap!' : ', yuk lanjut!')};
+  }catch(e){ return null; }
+}
 function hitungMisi(){
   const z = petakMisi();
   const m = [
@@ -557,6 +591,8 @@ function hitungMisi(){
     {id: 'jalan', kunci: true, pendek: 'Telusuri jalan besar di petakmu', tag: 'Segera',
      teks: 'Pinpin akan menunjukkan nama jalan besar di petak yang kamu tuju begitu data jalan siap. Jalan besar biasanya punya toko besar!'}
   ];
+  const mg = misiGanti();
+  if(mg) m[0] = mg;
   const mj = (typeof jlMisi === 'function') ? jlMisi() : null;
   if(mj) m[1] = mj;
   if(!z){
@@ -622,6 +658,15 @@ function teksKotak(n, N){ return N ? n + '/' + N : 'tanpa permukiman'; }
 async function muatDaftarZona(){
   zonaState = {mode: 'memuat', pesan: ''}; segarkanLayarAktif();
   await muatDataArea(sesi.depot);
+  if(peranSesi()){   // mode lihat: semua petak pilot depo
+    gridSet = new Set(); manualList = [];
+    zonaList = (AREA.zona || []).filter(z => z[24] === 1);
+    if(typeof jlSiapkanIndeks === 'function') jlSiapkanIndeks();
+    zonaState = {mode: zonaList.length ? 'ok' : 'kosong', offline: false};
+    segarkanLayarAktif();
+    if(typeof petRender === 'function') petRender();
+    return;
+  }
   let tugas = null, offline = false;
   try{
     tugas = await rpc('sales_tugas', {p_kode: sesi.kode});
@@ -667,6 +712,7 @@ function segarkanLayarAktif(){
 
 /* ---------- BERANDA ---------- */
 function statusRekamHtml(){
+  if(peranSesi()) return '';
   const inf = infoNative(), c = persetujuan();
   let judul, ket, kls = 'ok', aksi = '';
   if(c && !c.setuju){ judul = 'Perekaman jejak mati'; ket = 'Kamu memilih "Tidak". Temuan tetap bisa dicatat.'; kls = 'warn'; aksi = '<button onclick="tampil(\'scrSetuju\')">Ubah</button>'; }
@@ -722,14 +768,18 @@ function jksContoh(d){
   const kode = 'R01 M2C' + (13 + hk % 6);
   return {kode_jks: kode, toko_sedotan: potong.map(o => ({kode: o[6], nama: o[7]})), jalan_besar: ['Jl. Mayor Teddy', 'Jl. Subianto'], contoh: true};
 }
-/* ---- JKS hari ini, dihitung dari data toko di HP (o[14]=rute R01–R06 = Senin–Sabtu, o[15]=siklus M2C13 / M2C24 / M1) ----
-   Acuan siklus: Senin 26 Okt 2026 = R01 M2C13, lalu bergantian tiap minggu. Toko siklus M1 (sebulan sekali) belum dihitung. */
-const JKS_ACUAN = Date.UTC(2026, 9, 26);
-function jksSiklus(d){
-  const senin = new Date(d.getFullYear(), d.getMonth(), d.getDate() - ((d.getDay() + 6) % 7));
-  const mg = Math.round((Date.UTC(senin.getFullYear(), senin.getMonth(), senin.getDate()) - JKS_ACUAN) / (7 * 864e5));
-  return (((mg % 2) + 2) % 2) === 0 ? 'M2C13' : 'M2C24';
+/* ---- JKS hari ini, dihitung dari data toko di HP (o[14]=rute R01–R06 = Senin–Sabtu, o[15]=siklus) ----
+   Siklus mengikuti NOMOR MINGGU ISO sepanjang tahun (tidak di-reset tiap bulan):
+   M2C13 = minggu ganjil, M2C24 = minggu genap, M1 = tiap minggu. (Dicocokkan dengan data visit Malang Utara Agu–Okt 2026: 100% cocok.) */
+function isoWeek(d){
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  t.setUTCDate(t.getUTCDate() - ((t.getUTCDay() + 6) % 7) + 3);
+  const fy = new Date(Date.UTC(t.getUTCFullYear(), 0, 4));
+  return 1 + Math.round(((t - fy) / 864e5 - 3 + ((fy.getUTCDay() + 6) % 7)) / 7);
 }
+function jksSiklus(d){ return isoWeek(d) % 2 === 1 ? 'M2C13' : 'M2C24'; }
+function jksHariD(){ const w = wibDate(); return new Date(w.getUTCFullYear(), w.getUTCMonth(), w.getUTCDate()); }
+function jksCocok(o, rute, sik){ return o[14] === rute && (o[15] === 'M1' || o[15] === sik); }
 function jksNamaJalanBesar(maks){
   try{
     if(typeof JL === 'undefined' || !JL.data || !zonaList || !zonaList.length) return [];
@@ -746,18 +796,18 @@ function jksHariIni(d){
   const milik = (OUTLET || []).filter(o => tokoMilikSaya(o) && o[14]);
   if(!milik.length) return null;
   const rute = 'R0' + d.getDay(), sik = jksSiklus(d);
-  const hariIni = milik.filter(o => o[14] === rute && o[15] === sik);
+  const hariIni = milik.filter(o => jksCocok(o, rute, sik));
   return {kode_jks: rute + ' ' + sik, toko_sedotan: hariIni.filter(tokoSedotan).map(o => ({kode: o[6], nama: o[7]})), jalan_besar: jksNamaJalanBesar(3), jumlah_toko: hariIni.length};
 }
 /* petak -> jumlah toko JKS hari ini milik saya (untuk urutan & penanda di kartu zona) */
 function jksPerPetak(){
   const out = {};
   try{
-    const d = wibDate(), g = new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+    const g = jksHariD();
     if(!sesi || g.getDay() === 0) return out;
     const rute = 'R0' + g.getDay(), sik = jksSiklus(g);
     (OUTLET || []).forEach(o => {
-      if(!o[14] || o[14] !== rute || o[15] !== sik || !tokoMilikSaya(o)) return;
+      if(!jksCocok(o, rute, sik) || !tokoMilikSaya(o)) return;
       const k = keyDari(Math.floor(o[1] / S), Math.floor(o[0] / S));
       out[k] = (out[k] || 0) + 1;
     });
@@ -766,7 +816,8 @@ function jksPerPetak(){
 }
 function dataSambutan(d){
   if(window.PINPIN_JKS && window.PINPIN_JKS.kode_jks) return window.PINPIN_JKS;
-  return jksHariIni(d) || jksContoh(d);
+  if(peranSesi() && !mgrSales) return {};
+  return jksHariIni(d) || {};
 }
 
 function gabungJalan(a){ a = (a || []).filter(Boolean); if(!a.length) return ''; if(a.length === 1) return a[0]; return a.slice(0, -1).join(', ') + ' dan ' + a[a.length - 1]; }
@@ -839,6 +890,32 @@ function zonaCardHtml(z, idx){
     '<span class="muted" style="font-size:13px">' + esc(kecZona(z)) + (jarak ? ' · ' + jarak : '') + '</span>' + (jk ? '<span class="jksChip">JKS hari ini · ' + jk + ' toko</span>' : '') + '</span><span class="prio p' + (pr === '-' ? 'X' : pr) + '">Prioritas ' + pr + '</span></span>' +
     '<span class="row" style="width:100%;gap:10px">' + segKotakHtml(n, N) + '<span class="mono" style="font-size:13px;white-space:nowrap">' + teksKotak(n, N) + '</span></span></button>';
 }
+/* ---- bilah RBM/BM/ASS: pilih depo + filter sales ---- */
+function mgrBarHtml(){
+  const per = peranSesi(); if(!per) return '';
+  const deps = depotManajer();
+  const cnt = {}, nm = {};
+  (OUTLET || []).forEach(o => { const k = String(o[8] || ''); if(!k) return; cnt[k] = (cnt[k] || 0) + 1; nm[k] = o[9]; });
+  const ks = Object.keys(cnt).sort((a, b) => namaBersih(nm[a] || a).localeCompare(namaBersih(nm[b] || b)));
+  let h = '<section class="card" style="gap:8px"><div class="row" style="justify-content:space-between"><b style="font-size:14px">Mode lihat · ' + esc(per) + '</b><span class="muted" style="font-size:12px">tanpa perekaman GPS</span></div>';
+  if(deps.length > 1){
+    h += '<label class="muted" style="font-size:12px;font-weight:700">Depo</label><select class="mgrsel" onchange="gantiDepoMgr(this.value)">' +
+      deps.map(d => '<option value="' + esc(d) + '"' + (d === sesi.depot ? ' selected' : '') + '>' + esc(d) + '</option>').join('') + '</select>';
+  } else h += '<div class="muted" style="font-size:13px">Depo <b>' + esc(sesi.depot) + '</b></div>';
+  h += '<label class="muted" style="font-size:12px;font-weight:700">Sales</label><select class="mgrsel" onchange="gantiSalesMgr(this.value)"><option value="">Semua sales (' + (OUTLET || []).length + ' toko)</option>' +
+    ks.map(k => '<option value="' + esc(k) + '"' + (k === mgrSales ? ' selected' : '') + '>' + esc(namaBersih(nm[k] || k)) + ' (' + cnt[k] + ')</option>').join('') + '</select></section>';
+  return h;
+}
+async function gantiDepoMgr(dep){
+  if(!sesi || !dep || dep === sesi.depot) return;
+  sesi.depot = dep; lsSet('sl2_sesi', sesi); mgrSales = ''; depotAktif = dep;
+  zonaAktif = null; zonaList = []; manualList = [];
+  await muatDaftarZona();
+  if(map){ try{ map.remove(); }catch(e){} map = null; }
+  if(mapAll){ try{ mapAll.remove(); }catch(e){} mapAll = null; allLayers = []; allMe = null; allSel = -1; allFirstFit = false; }
+  segarkanLayarAktif();
+}
+function gantiSalesMgr(k){ mgrSales = k || ''; tokoAllOn = !!k || tokoAllOn; segarkanLayarAktif(); }
 function renderBeranda(){
   const el = $('berandaBody'); if(!el || !sesi) return;
   const sapa = (() => { const j = wibDate().getUTCHours(); return j < 11 ? 'Selamat pagi' : (j < 15 ? 'Selamat siang' : (j < 18 ? 'Selamat sore' : 'Selamat malam')); })();
@@ -847,6 +924,7 @@ function renderBeranda(){
     '<div class="col" style="flex:1;gap:2px"><span class="muted" style="font-size:13px;font-weight:600">' + HARI[d.getUTCDay()] + ', ' + d.getUTCDate() + ' ' + BULAN[d.getUTCMonth()] + '</span>' +
     '<b style="font-size:20px">Hai, ' + esc(namaDepan(sesi.nama)) + '</b></div></header>';
   h += statusRekamHtml();
+  h += mgrBarHtml();
   if(obSisa > 0) h += '<div class="banner warn"><span>' + obSisa + ' data (temuan/sisir) menunggu terkirim — otomatis dicoba lagi.</span><button onclick="kirimSemuaSekarang()">Kirim</button></div>';
   h += heroHtml();
   const nz = zonaList.length;
@@ -1163,7 +1241,7 @@ function rupiahRingkas(v){
 const BATAS_SEDOTAN = 200000;   // order rata-rata/bln di bawah ini = calon toko sedotan (nanti + EC & ROA saat data JKS masuk)
 function tokoSedotan(o){ if(o[13] != null) return o[13] === 1 || o[13] === true;   // flag sudah dihitung di data (omset + EC + ROA P3M)
   return (+o[4] || 0) > 0 && (+o[4]) < BATAS_SEDOTAN; }
-function tokoMilikSaya(o){ return !!(sesi && String(o[8] || '') === String(sesi.kode || '')); }
+function tokoMilikSaya(o){ if(!sesi) return false; if(peranSesi()) return !mgrSales || String(o[8] || '') === mgrSales; return String(o[8] || '') === String(sesi.kode || ''); }
 /* EC & ROA P3M: kolom o[11] (EC) dan o[12] (ROA) diisi saat data JKS/KPI ditarik.
    DEMO: selama kolomnya belum ada, pakai angka contoh yang stabil per toko. */
 function angka1(v){ return (Math.round(v * 10) / 10).toLocaleString('id-ID', {minimumFractionDigits: 1, maximumFractionDigits: 1}); }
