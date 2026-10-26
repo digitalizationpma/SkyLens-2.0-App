@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<title>SkyLens 2.0</title>
+<link rel="stylesheet" href="lib/leaflet.css">
+<style>
+/* Font: Inter (dibundel offline). Kalau file fonts/PlusJakartaSans-*.woff2 ditaruh di folder fonts/, font brand dipakai otomatis. */
+@font-face{font-family:'Plus Jakarta Sans';font-weight:400 600;font-style:normal;font-display:swap;src:url(fonts/PlusJakartaSans-Medium.woff2) format('woff2')}
+@font-face{font-family:'Plus Jakarta Sans';font-weight:700 800;font-style:normal;font-display:swap;src:url(fonts/PlusJakartaSans-ExtraBold.woff2) format('woff2')}
+@font-face{font-family:'Inter';font-weight:400 500;font-style:normal;font-display:swap;src:url(fonts/inter-500.woff) format('woff')}
+@font-face{font-family:'Inter';font-weight:600;font-style:normal;font-display:swap;src:url(fonts/inter-600.woff) format('woff')}
+@font-face{font-family:'Inter';font-weight:700;font-style:normal;font-display:swap;src:url(fonts/inter-700.woff) format('woff')}
+@font-face{font-family:'Inter';font-weight:800;font-style:normal;font-display:swap;src:url(fonts/inter-800.woff) format('woff')}
+:root{
+  --white:#FFFFFF; --ground:#F4F6F9; --line:#E3E7EE; --line2:#EEF1F6;
+  --ink:#1C212D; --navy:#1F2C4F; --navy-tint:#EEF1F7; --muted:#5E6678;
+  --orange:#FE7A1B; --orange-soft:#FFF0E4; --orange-ink:#B9480A; --orange-deep:#9A3A06;
+  --red:#9B1C28; --page:#E9ECF1;
+  --f:'Plus Jakarta Sans','Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,'Roboto Mono',monospace;
+  --nav-h:72px;
+  color-scheme:light;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;overscroll-behavior:none}
+body{background:var(--page);color:var(--ink);font-family:var(--f);font-size:15px;line-height:1.4;-webkit-text-size-adjust:100%}
+button{font-family:inherit;color:inherit;cursor:pointer}
+input,select,textarea{font-family:inherit}
+h1,h2,h3,p{margin:0}
+.mono{font-family:var(--mono)}
+.ico{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+
+#app{position:fixed;inset:0;margin:0 auto;max-width:480px;background:var(--ground);overflow:hidden}
+.scr{position:absolute;inset:0;display:none;flex-direction:column;background:var(--ground);overflow:hidden}
+.scr.white{background:#fff}
+.scrollY{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
+.tab{position:absolute;left:0;right:0;top:0;bottom:var(--nav-h);display:none;flex-direction:column;overflow:hidden}
+.pad{padding:22px 20px 28px;display:flex;flex-direction:column;gap:16px}
+.row{display:flex;align-items:center;gap:12px}
+.col{display:flex;flex-direction:column}
+.muted{color:var(--muted)}
+.card{background:#fff;border:1px solid var(--line);border-radius:18px}
+.hidden{display:none!important}
+
+/* tombol */
+.btn{border:0;border-radius:18px;padding:15px 16px;font-size:16px;font-weight:800;min-height:56px;display:flex;align-items:center;justify-content:center;gap:10px;width:100%;line-height:1.2}
+.btn.or{background:var(--orange);color:var(--ink)}
+.btn.nv{background:var(--navy);color:#fff}
+.btn.gh{background:#fff;border:1.5px solid var(--line);color:var(--ink);font-weight:700}
+.btn.sm{min-height:46px;font-size:14px;border-radius:14px;padding:11px 14px}
+.btn:disabled{opacity:.45}
+.btn:active:not(:disabled){transform:scale(.985)}
+.ibtn{width:44px;height:44px;border-radius:12px;border:0;background:var(--ground);display:flex;align-items:center;justify-content:center;flex:none}
+.chip{border:1.5px solid var(--line);border-radius:999px;padding:9px 14px;background:#fff;font-size:14px;font-weight:600;min-height:42px}
+.chip.on{border-color:var(--navy);background:var(--navy);color:#fff}
+.prio{font-size:11px;font-weight:800;border-radius:8px;padding:4px 8px;white-space:nowrap;background:var(--orange-soft);color:var(--orange-deep)}
+.prio.pB{background:#FFF4DA;color:#7A5300}.prio.pC{background:#EEF1F7;color:var(--navy)}.prio.pX{background:#EEF1F7;color:var(--muted)}
+.prio.man{background:#E3EEFF;color:#0d56c6}
+
+/* form */
+.fld{display:flex;flex-direction:column;gap:6px;border:1.5px solid var(--line);border-radius:16px;padding:10px 14px;background:#fff;min-height:60px;position:relative}
+.fld>span{font-size:12px;color:var(--muted);font-weight:700}
+.fld select{border:0;background:transparent;font-size:16px;font-weight:700;color:var(--ink);appearance:none;-webkit-appearance:none;width:100%;padding:0 22px 0 0;outline:0}
+.fld::after{content:"";position:absolute;right:16px;bottom:22px;width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg);pointer-events:none}
+.fld.on{border-color:var(--navy);background:#F7F8FB}
+.fld.dis{opacity:.55}
+.in{font-size:16px;border:1.5px solid var(--line);border-radius:14px;padding:13px 14px;background:#fff;color:var(--ink);min-height:52px;width:100%;outline:0}
+.in:focus{border-color:var(--navy)}
+.in.bad{border-color:#C2410C;background:#FFF8F2}
+.err{font-size:13px;font-weight:600;color:#9A3412}
+.req{font-size:11px;font-weight:700;color:var(--orange-ink)}
+.opt{font-size:11px;font-weight:600;color:var(--muted)}
+.lbl{font-size:14px;font-weight:700}
+.steps{display:flex;gap:6px}.steps i{flex:1;height:6px;border-radius:3px;background:var(--line)}
+.steps i.done{background:var(--navy)}.steps i.cur{background:var(--orange)}
+
+/* banner kecil */
+.banner{border-radius:14px;padding:10px 12px;font-size:13px;line-height:1.4;display:flex;gap:10px;align-items:center;justify-content:space-between}
+.banner.ok{background:#EEF1F7;color:var(--navy)}
+.banner.warn{background:var(--orange-soft);color:#7A3306}
+.banner.bad{background:#FDE8E6;color:#8f2a22}
+.banner button{border:0;background:rgba(28,33,45,.08);border-radius:10px;padding:8px 12px;font-size:12.5px;font-weight:800;white-space:nowrap;min-height:36px}
+
+/* nav bawah */
+.bnav{position:absolute;left:0;right:0;bottom:0;height:var(--nav-h);background:#fff;border-top:1px solid var(--line);display:flex;justify-content:space-around;align-items:center;padding:0 6px;z-index:5}
+.bnav button.t{border:0;background:transparent;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;font-weight:700;color:var(--muted);min-width:58px;padding:6px 0}
+.bnav button.t.on{color:var(--ink)}
+.bnav button.t.on .ico{stroke:var(--orange);stroke-width:2.2}
+.bnav .fab{width:60px;height:60px;border-radius:50%;border:0;background:var(--orange);color:var(--ink);margin-top:-30px;box-shadow:0 8px 20px rgba(254,122,27,.4),0 0 0 6px #fff;display:flex;align-items:center;justify-content:center}
+
+/* beranda */
+.hero{border-radius:22px;padding:16px 16px 14px;background:linear-gradient(140deg,#E8620C,#C24A07);color:#fff;display:flex;flex-direction:column;gap:10px;text-align:left;width:100%;border:0}
+.hero .pill{font-size:12px;font-weight:700;background:rgba(255,255,255,.2);border-radius:999px;padding:4px 10px;display:inline-flex;align-items:center;gap:5px}
+.hero .bar{height:9px;border-radius:5px;background:rgba(255,255,255,.28);overflow:hidden}
+.hero .bar i{display:block;height:100%;border-radius:5px;background:#fff;transition:width .5s}
+.hero .ms{display:flex;gap:10px;align-items:center;font-size:13px;line-height:1.3;padding:7px 0;border-top:1px solid rgba(255,255,255,.2)}
+.hero .ms .ck{width:22px;height:22px;border-radius:50%;border:1.5px solid rgba(255,255,255,.65);display:flex;align-items:center;justify-content:center;flex:none;font-size:11px;font-weight:800}
+.hero .ms .ck.done{background:#fff;color:#C24A07;border-color:#fff}
+.hero .ms.lock{opacity:.72}
+.hero .ms .tx{flex:1;min-width:0}
+.hero .ms .tag{font-size:11px;font-weight:800;background:rgba(255,255,255,.2);border-radius:999px;padding:3px 8px;white-space:nowrap}
+.zonecard{text-align:left;padding:14px;display:flex;flex-direction:column;gap:10px;width:100%}
+.zonecard.here{box-shadow:inset 0 0 0 2px var(--orange)}
+.seg16{display:grid;grid-template-columns:repeat(16,1fr);gap:2px;flex:1}
+.seg16 i{height:8px;border-radius:2px;background:var(--line)}
+.seg16 i.on{background:var(--navy)}
+.seg16 i.cur{background:var(--orange)}
+.seg16.nol{grid-template-columns:1fr}.seg16.nol i{background:repeating-linear-gradient(45deg,#E6EAF1 0 6px,#F3F5F9 6px 12px)}
+/* jalan (Pacman) + kotak cerdas */
+.jlBox{display:flex;flex-direction:column;gap:7px;border-top:1px solid var(--line2);padding-top:9px}
+.jlJud{font-size:13px;font-weight:800;color:var(--navy);display:inline-flex;align-items:center}
+.jlBar{height:8px;border-radius:5px;background:var(--line);overflow:hidden}.jlBar i{display:block;height:100%;background:#00BFA5;border-radius:5px;transition:width .4s}
+.jlList{display:flex;flex-direction:column;gap:4px}
+.jlRow{display:flex;align-items:center;gap:8px;font-size:12.5px}
+.jlRow .jlCk{width:18px;height:18px;border-radius:50%;border:1.5px solid #C9D2E3;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;color:#fff;flex:none}
+.jlRow.ok .jlCk{background:#00BFA5;border-color:#00BFA5}
+.jlRow .jlNm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.jlRow .jlNm em{font-style:normal;font-size:10.5px;font-weight:800;color:#8A4B00;background:#FFF0E4;border-radius:6px;padding:1px 5px;margin-left:4px}
+.jlRow .mono{font-size:12px;color:var(--muted)}
+.jlKosong{display:flex;flex-direction:column;gap:3px;background:#F4F6F9;border-radius:14px;padding:12px}.jlKosong b{font-size:15px;color:var(--navy)}.jlKosong span{font-size:12.5px;color:var(--muted)}
+.jlLeg{background:#fff;border-radius:14px;box-shadow:0 4px 14px rgba(28,33,45,.2);margin-bottom:8px!important;overflow:hidden;max-width:220px}
+.jlLegBtn{border:0;background:#fff;display:flex;align-items:center;gap:2px;padding:7px 10px;font-size:12px;font-weight:800;color:var(--navy);min-height:34px}
+.jlLegBtn .jlCar{margin-left:4px;transition:transform .15s;color:var(--muted)}.jlLeg.open .jlCar{transform:rotate(180deg)}
+.jlLegIsi{display:none;padding:0 10px 9px;font-size:11.5px;font-weight:600;color:var(--ink);flex-direction:column;gap:4px}.jlLeg.open .jlLegIsi{display:flex}
+.jlLegIsi div{display:flex;align-items:center;gap:7px}
+.jlSw{width:22px;height:12px;border-radius:3px;background:rgba(17,24,39,.42);display:inline-block;flex:none;margin:0 2px}
+.avatar{width:46px;height:46px;border-radius:50%;background:var(--navy);color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none}
+.stat{background:var(--ground);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:2px}
+.stat span{font-size:12px;color:var(--muted);font-weight:600}.stat b{font-size:17px}
+.stat.or{background:var(--orange-soft)}.stat.or span{color:#7A3306}
+.empty{padding:34px 16px;text-align:center;color:var(--muted);font-size:14px;line-height:1.5}
+
+/* riwayat */
+.hist{display:flex;gap:12px;align-items:center;padding:12px}
+.hist .th{width:50px;height:50px;border-radius:14px;flex:none}
+.tagc{align-self:flex-start;font-size:11px;font-weight:800;border-radius:999px;padding:3px 9px}
+.sync{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:10px;font-weight:700;width:58px;text-align:center}
+
+/* akun */
+.cek{display:flex;gap:12px;align-items:center;padding:11px 0;border-top:1px solid var(--line2)}
+.cek:first-child{border-top:0}
+.cek .ic{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;flex:none}
+.cek .ic.y{background:var(--navy-tint);color:var(--navy)}
+.cek .ic.n{background:var(--orange);color:var(--ink)}
+.cek .ic.o{background:#E9ECF1;color:var(--muted)}
+.cek .tx{flex:1;display:flex;flex-direction:column;gap:1px;font-size:14px;font-weight:700}
+.cek .tx small{font-size:12px;color:var(--muted);font-weight:500}
+.cek button{border:0;border-radius:999px;padding:9px 14px;background:var(--orange);color:var(--ink);font-size:13px;font-weight:800;min-height:40px;white-space:nowrap}
+.panduan{background:var(--ground);border-radius:14px;padding:12px 14px;font-size:13px;line-height:1.5;margin-top:6px}
+.panduan h3{font-size:13.5px;margin-bottom:4px}
+.panduan ol{margin:4px 0 0;padding-left:18px}
+.panduan li{margin:4px 0}
+.sec{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:6px 2px -4px}
+.ver{font-size:11.5px;color:#8A93A6;text-align:center}
+
+/* peta */
+#map,#mapAll{position:absolute;inset:0;background:#E7ECF2}
+.leaflet-container{font-family:var(--f)}
+.topcard{position:absolute;left:14px;right:14px;top:14px;z-index:900;background:#fff;border-radius:20px;padding:8px 12px 8px 8px;box-shadow:0 6px 18px rgba(28,33,45,.16);display:flex;align-items:center;gap:10px}
+.navcard{position:absolute;left:14px;right:14px;top:84px;z-index:890;background:var(--navy);color:#fff;border-radius:20px;padding:14px 16px;display:none;gap:14px;align-items:center}
+.navcard .arr{width:60px;height:60px;border-radius:50%;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;flex:none}
+.sweepcard{position:absolute;left:14px;right:14px;top:84px;z-index:890;background:#fff;border-radius:22px;box-shadow:0 10px 30px rgba(20,24,35,.16);padding:14px 16px;display:none;flex-direction:column;gap:9px;max-height:calc(100% - 230px);overflow-y:auto}
+.zinfo{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;border-top:1px solid var(--line2);padding-top:10px}
+.zinfo div{display:flex;flex-direction:column;gap:1px}.zinfo span{font-size:12px;color:var(--muted);font-weight:600}.zinfo b{font-size:15px}
+.bsheet{position:absolute;left:0;right:0;bottom:0;z-index:890;background:#fff;border-radius:26px 26px 0 0;padding:12px 18px 18px;box-shadow:0 -8px 24px rgba(28,33,45,.12);display:flex;flex-direction:column;gap:10px}
+.grab{display:block;width:44px;height:5px;border-radius:3px;background:#DDE2EA;margin:0 auto;flex:none}
+.bar-actions{display:flex;gap:10px}
+/* posisi toggle Citra/Peta & tombol recenter selalu di atas bottom sheet (tinggi sheet diukur lewat JS -> --shH) */
+.leaflet-bottom.leaflet-left{bottom:calc(var(--shH,120px) + 12px);left:2px}
+#scrPeta .leaflet-bottom.leaflet-left,#tabPeta .leaflet-bottom.leaflet-left{transition:bottom .18s ease}
+.basemapToggle{display:flex;background:#fff;border-radius:14px;box-shadow:0 4px 14px rgba(28,33,45,.2);overflow:hidden;padding:3px;gap:2px}
+.bmBtn{border:0;background:#fff;padding:7px 12px;font-size:12.5px;font-weight:700;color:var(--muted);border-radius:11px}
+.bmBtn.on{background:var(--navy);color:#fff}
+#recenterBtn{position:absolute;right:14px;bottom:calc(var(--shH,120px) + 14px);transition:bottom .18s ease;width:46px;height:46px;border-radius:50%;background:#fff;border:0;box-shadow:0 4px 14px rgba(28,33,45,.2);z-index:880;display:none;align-items:center;justify-content:center}
+.mapbanner{position:absolute;left:14px;right:14px;z-index:895;font-size:12.5px;line-height:1.4;padding:9px 12px;border-radius:14px;display:none}
+#gpsLemahBanner{bottom:150px;background:#FFF4E0;border:1px solid #F0C27A;color:#8A4B00}
+#searchTokoPanel{display:none;position:absolute;left:14px;right:14px;top:14px;background:#fff;border-radius:20px;padding:12px 14px;box-shadow:0 8px 24px rgba(28,33,45,.2);z-index:950;max-height:72%;overflow-y:auto}
+.tokoRes{border:1px solid var(--line);border-radius:12px;padding:9px 11px;margin:7px 0;display:flex;justify-content:space-between;align-items:center}
+.dotT{width:28px;height:28px;border-radius:50%;flex:none;margin-left:8px}
+
+/* wizard */
+.wizhead{padding:16px 20px 0;display:flex;flex-direction:column;gap:14px;flex:none}
+.wizfoot{padding:12px 20px 18px;border-top:1px solid var(--line2);display:flex;gap:10px;background:#fff;flex:none}
+.opt1{text-align:left;border:1.5px solid var(--line);border-radius:20px;padding:16px;background:#fff;display:flex;gap:14px;align-items:center;min-height:86px;width:100%}
+.opt1.on{border:2px solid var(--orange);background:#FFF7F0;box-shadow:0 0 0 4px var(--orange-soft)}
+.opt1 .bx{width:50px;height:50px;border-radius:16px;background:var(--navy-tint);color:var(--navy);display:flex;align-items:center;justify-content:center;flex:none}
+.opt1.on .bx{background:var(--orange);color:var(--ink)}
+.rad{text-align:left;border:1.5px solid var(--line);border-radius:16px;padding:12px 14px;background:#fff;display:flex;gap:12px;align-items:center;min-height:54px;width:100%}
+.rad.on{border:2px solid var(--orange);background:#FFF7F0}
+.rad .dt{width:22px;height:22px;border-radius:50%;border:2px solid #C3CAD6;flex:none}
+.rad.on .dt{border:7px solid var(--orange)}
+.photo{height:160px;border-radius:18px;border:2px dashed #C3CAD6;background:#F7F8FA;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--navy);width:100%;overflow:hidden;position:relative}
+.photo.bad{border-color:#C2410C;background:#FFF8F2}
+.photo.has{border:0;background:#000}
+.photo img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.photo .retake{position:absolute;top:10px;right:10px;display:flex;gap:6px;align-items:center;border-radius:999px;padding:8px 12px;background:#fff;font-size:13px;font-weight:700;color:var(--ink)}
+.sz{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.sz button{border:1.5px solid var(--line);border-radius:16px;background:#fff;padding:12px 6px;display:flex;flex-direction:column;gap:2px;align-items:center;min-height:68px}
+.sz button b{font-size:17px}.sz button span{font-size:11.5px;color:var(--muted);font-weight:600}
+.sz.two{grid-template-columns:repeat(2,1fr)}
+.sz button.on{border:2px solid var(--orange);background:#FFF7F0}
+.sumrow{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--line2);font-size:14px}
+.sumrow:first-child{border-top:0}.sumrow span{color:var(--muted)}.sumrow b{text-align:right}
+
+/* modal / sheet umum */
+.scrim{position:absolute;inset:0;background:rgba(20,24,35,.45);z-index:2000;display:none;align-items:flex-end}
+.sheetm{background:#fff;border-radius:26px 26px 0 0;width:100%;max-height:86%;display:flex;flex-direction:column;padding:12px 20px 22px;gap:12px;overflow-y:auto;animation:rise .25s ease}
+.sheetm.mid{border-radius:24px;margin:auto 16px;width:auto}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes fin{from{opacity:0}to{opacity:1}}
+#toast{position:absolute;left:16px;right:16px;bottom:calc(var(--nav-h) + 16px);z-index:3000;background:var(--ink);color:#fff;border-radius:16px;padding:12px 14px;font-size:14px;line-height:1.35;display:none;box-shadow:0 8px 24px rgba(20,24,35,.28);pointer-events:none}
+body.nonav #toast{bottom:24px}
+
+/* Pinpin */
+#pet{position:absolute;left:0;top:0;width:76px;height:76px;z-index:1500;touch-action:none;user-select:none;-webkit-user-select:none;border:0;background:transparent;padding:0;display:none}
+#pet.snap{transition:transform .38s cubic-bezier(.3,1.4,.5,1)}
+.petIn{width:100%;height:100%;transform-origin:50% 90%;transition:transform .12s ease-out;filter:drop-shadow(0 6px 8px rgba(28,33,45,.22))}
+.petIn svg{width:100%;height:100%;overflow:visible;display:block}
+#pet .hopW{width:100%;height:100%;animation:idleHop 6s ease-in-out infinite}
+#pet.drag .hopW{animation:none}
+@keyframes idleHop{0%,86%,100%{transform:none}90%{transform:translateY(-12px) scale(.96,1.05)}94%{transform:scale(1.06,.94)}}
+#pet .badge{position:absolute;right:-2px;top:-2px;min-width:24px;height:24px;border-radius:12px;background:var(--navy);color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;padding:0 6px;border:2px solid #fff;gap:2px}
+#petTip{position:absolute;z-index:1499;max-width:200px;background:var(--navy);color:#fff;border-radius:14px;padding:8px 11px;font-size:12.5px;font-weight:700;line-height:1.35;opacity:0;transform:scale(.8);transition:opacity .2s,transform .25s cubic-bezier(.3,1.5,.5,1);pointer-events:none}
+#petTip.show{opacity:1;transform:none}
+#petScrim{position:absolute;inset:0;background:rgba(15,20,32,.45);z-index:2100;opacity:0;pointer-events:none;transition:opacity .25s}
+#petScrim.show{opacity:1;pointer-events:auto}
+#petSheet{position:absolute;left:0;right:0;bottom:0;top:40px;z-index:2101;background:linear-gradient(180deg,#FFF1E6 0,#FFF8F2 300px,#F4F6F9 480px);border-radius:28px 28px 0 0;transform:translateY(105%);transition:transform .42s cubic-bezier(.2,.9,.25,1);display:flex;flex-direction:column;overflow:hidden;visibility:hidden}
+#petSheet.show{transform:none;visibility:visible}
+.pgrab{width:44px;height:5px;border-radius:3px;background:#D5DAE3;margin:8px auto 0;flex:none}
+.shead{display:flex;align-items:center;justify-content:space-between;padding:6px 16px 0;flex:none}
+.round{width:40px;height:40px;border-radius:50%;border:0;background:rgba(28,33,45,.07);color:var(--ink);display:flex;align-items:center;justify-content:center}
+.chipw{font-size:12px;font-weight:800;background:#fff;border:1px solid var(--line);border-radius:999px;padding:6px 12px;display:flex;gap:6px;align-items:center}
+.sbody{flex:1;overflow-y:auto;padding:6px 18px 28px;display:flex;flex-direction:column;gap:14px}
+.sbody>*{flex-shrink:0}
+.pstats{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.pstat{display:flex;flex-direction:column}
+.pstat .k{font-size:14px;font-weight:700}
+.pstat .v{font-size:52px;font-weight:800;line-height:1;letter-spacing:-.03em;display:flex;align-items:center;gap:6px}
+.pstat .v small{font-size:15px;font-weight:700;color:var(--muted);letter-spacing:0;align-self:flex-end;margin-bottom:6px}
+.pstat.r{align-items:flex-end;text-align:right}
+.pstat .s{font-size:12px;color:var(--muted);font-weight:600}
+.flame{width:34px;height:40px}.flame.off{filter:grayscale(1);opacity:.45}
+.big{position:relative;height:240px;display:flex;align-items:center;justify-content:center;margin-top:-6px}
+.bigHit{border:0;background:transparent;padding:0;width:210px;height:210px;border-radius:40px}
+.bigHit .hopper{width:100%;height:100%;transform-origin:50% 95%}
+.bigHit svg{width:100%;height:100%;overflow:visible;display:block}
+.hopper.boing{animation:boing .5s cubic-bezier(.3,1.6,.5,1)}
+@keyframes boing{0%{transform:none}25%{transform:scale(1.12,.86)}55%{transform:translateY(-26px) scale(.92,1.1)}80%{transform:scale(1.05,.95)}100%{transform:none}}
+.say{align-self:center;max-width:300px;background:var(--navy);color:#fff;border-radius:16px;padding:9px 14px;font-size:13.5px;font-weight:700;line-height:1.4;text-align:center;position:relative;min-height:40px}
+.say::after{content:"";position:absolute;left:50%;bottom:-6px;width:12px;height:12px;background:var(--navy);transform:translateX(-50%) rotate(45deg);border-radius:2px}
+.tapme{position:absolute;right:6px;bottom:18px;font-size:11px;font-weight:800;color:var(--orange-ink);background:#fff;border:1px solid #FFD9BD;border-radius:999px;padding:4px 9px}
+.pprog{display:flex;flex-direction:column;gap:6px;align-items:center}
+.pbar{width:100%;max-width:250px;height:22px;border-radius:11px;background:#fff;border:1px solid var(--line);position:relative;overflow:hidden}
+.pbar i{position:absolute;left:0;top:0;bottom:0;border-radius:11px;background:repeating-linear-gradient(-45deg,var(--orange) 0 8px,#FF9445 8px 16px);transition:width .5s cubic-bezier(.3,1.2,.5,1)}
+.pbar b{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;font-family:var(--mono)}
+.pcap{font-size:12px;color:var(--muted);font-weight:600;text-align:center}
+.pcard{background:#fff;border:1px solid var(--line);border-radius:20px;padding:14px 14px 6px;display:flex;flex-direction:column}
+.pcard h3{margin:0 0 4px;font-size:15px;font-weight:800;display:flex;justify-content:space-between;align-items:center}
+.pcard h3 span{font-size:12px;color:var(--muted);font-weight:700}
+.pms{display:flex;gap:11px;padding:11px 0;border-top:1px solid var(--line2);align-items:flex-start}
+.pms:first-of-type{border-top:0}
+.pck{width:26px;height:26px;border-radius:50%;border:1.5px solid #D5DAE3;flex:none;display:flex;align-items:center;justify-content:center;color:#fff;margin-top:1px}
+.pck.done{background:var(--navy);border-color:var(--navy)}
+.pms .t{font-size:13.5px;line-height:1.42;font-weight:600}
+.pms .m{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.pill2{font-size:11px;font-weight:800;border-radius:999px;padding:3px 9px;background:var(--orange-soft);color:#9A3A06;font-family:var(--mono)}
+.pill2.n{background:var(--navy-tint);color:var(--navy)}
+.pms.lock .t{color:var(--muted)}
+.pms.lock .pck{color:var(--muted);background:var(--line2)}
+.pms .pck:not(.done){color:var(--muted)}
+.mini{height:6px;border-radius:3px;background:var(--line);margin-top:7px;overflow:hidden}
+.mini i{display:block;height:100%;background:var(--orange);border-radius:3px;transition:width .5s}
+.badges{display:flex;justify-content:space-between;align-items:center;padding:6px 4px 10px}
+.bd{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;font-weight:700;color:var(--muted)}
+.bd svg{width:28px;height:32px}
+.dash{flex:1;height:2px;background:var(--line);margin:0 4px 14px}
+.confetti{position:absolute;inset:0;pointer-events:none;z-index:2200;overflow:hidden}
+.confetti i{position:absolute;top:-12px;width:8px;height:12px;border-radius:2px;animation:fall 1.6s cubic-bezier(.3,.6,.6,1) forwards}
+@keyframes fall{to{transform:translate(var(--dx),900px) rotate(var(--r));opacity:.9}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion: reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+/* gerak maskot */
+
+svg .seg{transform-box:view-box;transform-origin:0 0}
+.rig{transform-box:view-box;transform-origin:100px 190px}
+.shadow{transform-box:fill-box;transform-origin:center}
+.eye{transform-box:fill-box;transform-origin:center;animation:blink 4.6s infinite}
+@keyframes blink{0%,93%,100%{transform:scaleY(1)}96%{transform:scaleY(.1)}}
+.sp{transform-box:fill-box;transform-origin:center;animation:pop 1s ease-in-out infinite}
+.s2{animation-delay:.2s}.s3{animation-delay:.4s}.s4{animation-delay:.6s}
+@keyframes pop{0%,100%{transform:scale(.4) rotate(0);opacity:.35}50%{transform:scale(1.15) rotate(25deg);opacity:1}}
+.nt{animation:float 2s ease-out infinite}.n2{animation-delay:1s}
+@keyframes float{0%{transform:translate(0,8px);opacity:0}25%{opacity:1}100%{transform:translate(10px,-18px);opacity:0}}
+.drop{animation:drop 2.4s ease-in infinite}
+@keyframes drop{0%{transform:translateY(0);opacity:0}20%{opacity:1}100%{transform:translateY(24px);opacity:0}}
+.tl{animation:tearL 1s ease-in infinite;opacity:0}
+.tr{animation:tearR 1s ease-in infinite;opacity:0}
+@keyframes tearL{0%{transform:translate(0,0) scale(.5);opacity:0}12%{opacity:1}100%{transform:translate(-34px,78px) scale(1.05);opacity:0}}
+@keyframes tearR{0%{transform:translate(0,0) scale(.5);opacity:0}12%{opacity:1}100%{transform:translate(34px,78px) scale(1.05);opacity:0}}
+.pud{transform-box:fill-box;transform-origin:center;animation:pud 1s ease-in-out infinite alternate}
+@keyframes pud{from{transform:scaleX(.85)}to{transform:scaleX(1.1)}}
+
+
+/* popup toko bermerek */
+.slPop .leaflet-popup-content-wrapper{border-radius:18px;padding:0;box-shadow:0 12px 32px rgba(28,33,45,.24);background:#fff;color:var(--ink,#1C212D)}
+.slPop .leaflet-popup-content{margin:0;width:232px!important;max-width:calc(100vw - 72px);font-family:inherit}
+.slPop .leaflet-popup-tip{box-shadow:0 8px 16px rgba(28,33,45,.14)}
+.slPop a.leaflet-popup-close-button{top:10px;right:10px;width:26px;height:26px;border-radius:50%;background:var(--ground,#F4F6F9);color:var(--muted,#5B6478);font:700 17px/26px system-ui,sans-serif;text-align:center;padding:0}
+.slPop a.leaflet-popup-close-button:hover{background:#E8ECF3;color:var(--ink,#1C212D)}
+.spB{padding:14px 40px 14px 14px;display:flex;flex-direction:column;gap:8px}
+.spNama{font-size:15px;font-weight:800;line-height:1.25;letter-spacing:-.1px}
+.spChips{display:flex;flex-wrap:wrap;gap:6px}
+.spChip{font-size:11px;font-weight:800;border-radius:99px;padding:3px 9px;letter-spacing:.02em}
+.spTipe{background:var(--soft,#FFF0E4);color:#B9480A}
+.spRow{display:flex;flex-direction:column;gap:1px;padding-top:7px;border-top:1px solid var(--line,#E7EBF2)}
+.spLab{font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted,#5B6478)}
+.spVal{font-size:13px;font-weight:600;word-break:break-word}
+.spMono{font-family:'IBM Plex Mono',ui-monospace,Menlo,monospace;font-size:12.5px}
+
+/* dropdown bermerek (SLSelect) di dalam field form */
+:root{--slsel-bg:#fff;--slsel-line:var(--line);--slsel-pop:#fff;--or-ink:#B9480A}
+.fld .slsel{display:block}
+.fld .slsel-btn{border:0;background:transparent!important;padding:0 24px 0 0;min-height:0;border-radius:0;font-size:16px;font-weight:700;color:var(--ink)}
+.fld .slsel-car{display:none}
+.fld .slsel-lab.ph{color:var(--muted);font-weight:600}
+.slsel-sheet .ttl{font-size:16px}
+.slsel-sheet .slsel-opt{border-radius:14px}
+.slsel-opt.sel{background:var(--soft,#FFF0E4)!important;color:#B9480A}
+
+/* Pinpin lagi mikir di sheet prospek */
+.prospekPin{position:relative;width:110px;height:104px;margin:2px auto -4px;flex:none}
+.prospekPin svg{width:100px;height:100px;display:block;margin:0 auto;overflow:visible;animation:pinMikir 2.6s ease-in-out infinite;transform-origin:50% 90%}
+.prospekPin .qm{position:absolute;right:-2px;top:-2px;width:34px;height:34px;border-radius:50%;background:var(--navy);color:#fff;font:800 20px/34px system-ui,sans-serif;text-align:center;box-shadow:0 4px 12px rgba(31,44,79,.3);animation:qmBob 1.6s ease-in-out infinite}
+@keyframes pinMikir{0%,100%{transform:rotate(-3deg)}50%{transform:rotate(3deg) translateY(-2px)}}
+@keyframes qmBob{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-4px) scale(1.06)}}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ============ MASUK ============ -->
+  <section id="scrDepot" class="scr white">
+    <div class="scrollY">
+      <div style="position:relative;padding:36px 24px 28px;display:flex;flex-direction:column;gap:18px;min-height:100%">
+        <svg viewBox="0 0 390 260" aria-hidden="true" style="position:absolute;left:0;top:0;width:100%;height:260px;pointer-events:none"><path d="M-20 230 C80 120 230 70 420 90" fill="none" stroke="#FFF0E4" stroke-width="44" stroke-linecap="round"/></svg>
+        <img src="img/logo-navy.png" alt="SkyLens" style="width:150px;height:auto;position:relative">
+        <div style="position:relative;display:flex;flex-direction:column;gap:4px;margin-top:10px">
+          <h1 style="font-size:26px;font-weight:800;letter-spacing:-.02em">Selamat datang</h1>
+          <p class="muted" style="font-size:15px">Pilih area dan namamu untuk mulai kerja hari ini.</p>
+        </div>
+        <label class="fld" id="fldDepot"><span>Area</span>
+          <select id="depotInput" aria-label="Pilih area"><option value="">Pilih area…</option></select></label>
+        <div id="depotLoading" class="muted" style="display:none;font-size:13px">Memuat daftar sales…</div>
+        <label class="fld dis" id="fldNama"><span>Nama</span>
+          <select id="kodeInput" disabled aria-label="Pilih namamu"><option value="">Pilih area dulu</option></select></label>
+        <button class="btn or" id="btnMasuk" onclick="masuk()" disabled style="margin-top:6px">Masuk</button>
+        <div style="flex:1"></div>
+        <div class="ver" id="verLabel"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ IZIN LOKASI ============ -->
+  <section id="scrSetuju" class="scr white">
+    <div class="scrollY" style="display:flex;flex-direction:column">
+      <div style="padding:40px 24px 24px;display:flex;flex-direction:column;gap:18px;flex:1">
+        <span style="width:64px;height:64px;border-radius:20px;background:#FFF0E4;color:#B9480A;display:flex;align-items:center;justify-content:center"><svg class="ico" viewBox="0 0 24 24" style="width:32px;height:32px"><path d="M3 11 21 3l-8 18-2-8z"/></svg></span>
+        <h1 style="font-size:26px;font-weight:800;line-height:1.2">Boleh rekam rute kerjamu?</h1>
+        <p class="muted" style="font-size:15px;line-height:1.6">SkyLens merekam lokasi HP selama jam kerja <b style="color:var(--ink)" id="jamKerjaTxt">05.00–21.00</b>, termasuk saat layar mati. Gunanya untuk melihat kotak mana yang sudah kamu jelajahi. Data hanya dilihat atasanmu.</p>
+        <div class="card" style="padding:14px;display:flex;gap:12px;align-items:center;background:var(--ground);border:0"><svg class="ico" viewBox="0 0 24 24" style="color:var(--navy)"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg><span style="font-size:14px;line-height:1.45">Kalau menolak, kamu tetap bisa mencatat temuan.</span></div>
+        <div style="flex:1"></div>
+        <button class="btn or" onclick="jawabSetuju(true)">Saya izinkan</button>
+        <button class="btn gh" onclick="jawabSetuju(false)">Tidak sekarang</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PERSIAPAN HP (onboarding) ============ -->
+  <section id="scrSetelan" class="scr">
+    <div class="scrollY">
+      <div class="pad" style="padding-top:26px">
+        <div><h1 style="font-size:24px;font-weight:800" id="setelanJudul">Persiapan HP</h1><p class="muted" style="font-size:14px;margin-top:4px">Beberapa izin supaya rute tetap terekam walau layar mati</p></div>
+        <div id="setelanBody" style="display:flex;flex-direction:column;gap:14px"></div>
+      </div>
+    </div>
+    <div class="wizfoot"><button class="btn or" id="btnSetelanLanjut" onclick="tutupSetelan()">Lanjut</button></div>
+  </section>
+
+  <!-- ============ UTAMA (tab) ============ -->
+  <section id="scrMain" class="scr">
+    <div id="tabBeranda" class="tab"><div class="scrollY"><div class="pad" id="berandaBody"></div></div></div>
+    <div id="tabPeta" class="tab">
+      <div id="mapAll"></div>
+      <div class="topcard" style="padding:6px 14px 6px 14px;gap:10px">
+        <svg class="ico" viewBox="0 0 24 24" style="color:var(--muted)"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="qAll" class="in" style="border:0;min-height:44px;padding:0;font-size:15px" placeholder="Cari zona atau toko" autocomplete="off">
+      </div>
+      <div id="allRes" style="display:none;position:absolute;left:14px;right:14px;top:70px;z-index:950;background:#fff;border-radius:18px;box-shadow:0 8px 24px rgba(28,33,45,.2);padding:6px 12px;max-height:55%;overflow-y:auto"></div>
+      <div class="bsheet" id="allSheet"></div>
+    </div>
+    <div id="tabRiwayat" class="tab"><div class="scrollY"><div class="pad" id="riwayatBody" style="padding-top:20px"></div></div></div>
+    <div id="tabAkun" class="tab"><div class="scrollY"><div class="pad" id="akunBody" style="padding-top:20px"></div></div></div>
+    <nav class="bnav" aria-label="Navigasi bawah">
+      <button class="t" data-tab="beranda" onclick="bukaTab('beranda')"><svg class="ico" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Beranda</button>
+      <button class="t" data-tab="peta" onclick="bukaTab('peta')"><svg class="ico" viewBox="0 0 24 24"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg>Peta</button>
+      <button class="fab" onclick="bukaWizard()" aria-label="Catat temuan"><svg class="ico" viewBox="0 0 24 24" style="width:28px;height:28px;stroke-width:2.4"><path d="M12 5v14M5 12h14"/></svg></button>
+      <button class="t" data-tab="riwayat" onclick="bukaTab('riwayat')"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>Riwayat</button>
+      <button class="t" data-tab="akun" onclick="bukaTab('akun')"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c1-4 4-6 8-6s7 2 8 6"/></svg>Akun</button>
+    </nav>
+  </section>
+
+  <!-- ============ PETA ZONA (menuju / sisir) ============ -->
+  <section id="scrPeta" class="scr">
+    <div style="position:absolute;inset:0"><div id="map"></div></div>
+    <div class="topcard">
+      <button class="ibtn" onclick="kembaliKeDaftar()" aria-label="Kembali"><svg class="ico" viewBox="0 0 24 24"><path d="M15 5 8 12l7 7"/></svg></button>
+      <div class="col" style="flex:1;min-width:0"><b id="zoneTitle" style="font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">—</b><span id="zoneSub" class="muted" style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">—</span></div>
+      <button class="ibtn" id="searchToggleBtn" onclick="toggleSearchToko()" aria-label="Cek toko"><svg class="ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
+    </div>
+    <!-- menuju -->
+    <div class="navcard" id="navcard" onclick="panKeZonaAktif()">
+      <div class="arr"><svg id="navArrow" viewBox="0 0 24 24" style="width:34px;height:34px;transition:transform .4s"><path d="M12 3v18M12 3l-6 6M12 3l6 6" fill="none" stroke="#FE7A1B" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="col" style="gap:2px"><b id="disttext" style="font-size:32px;line-height:1">…</b><span id="etatext" style="font-size:13px;color:#C9D0DE">mencari lokasi…</span></div>
+    </div>
+    <!-- sisir -->
+    <div class="sweepcard" id="sweepcard"></div>
+    <div class="mapbanner" id="gpsLemahBanner"><b>Sinyal GPS lemah</b> (mungkin di dalam gedung) — posisi ditahan <span id="gpsLemahDetik"></span> supaya jejak tidak ngaco. Keluar ke tempat terbuka sebentar, nanti otomatis jalan lagi.</div>
+    <div id="searchTokoPanel">
+      <input id="qTokoHp" class="in" placeholder="Cari kode/nama toko (cek sebelum catat temuan baru)" autocomplete="off">
+      <div id="hintTokoHp" class="muted" style="font-size:12px;margin-top:6px">Ketik minimal 2 huruf/angka</div>
+      <div id="listTokoHp" style="margin-top:6px"></div>
+    </div>
+    <button id="recenterBtn" aria-label="Kembali ke posisi kamu"><svg width="22" height="22" viewBox="0 0 24 24"><path d="M12 2.5 L20.5 20.5 L12 16.2 L3.5 20.5 Z" fill="#1F2C4F"/></svg></button>
+    <div class="bsheet" id="zoneSheet"></div>
+  </section>
+
+  <!-- ============ WIZARD CATAT TEMUAN ============ -->
+  <section id="scrTemuan" class="scr white"><div id="wizBody" style="display:flex;flex-direction:column;height:100%"></div></section>
+
+  <!-- ============ Pinpin ============ -->
+  <div id="petTip" role="status"></div>
+  <button type="button" id="pet" aria-label="Pinpin. Ketuk untuk buka panel, geser untuk pindah"><div class="hopW"><div class="petIn" id="petIn"></div></div><span class="badge" id="petBadge"></span></button>
+  <div id="petScrim"></div>
+  <section id="petSheet" role="dialog" aria-modal="true" aria-label="Panel Pinpin" aria-hidden="true">
+    <div class="pgrab"></div>
+    <div class="shead">
+      <button type="button" class="round" id="petClose" aria-label="Tutup panel"><svg class="ico" viewBox="0 0 24 24" style="width:18px;height:18px"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+      <span class="chipw"><svg viewBox="0 0 24 24" style="width:14px;height:14px" aria-hidden="true"><path d="M12 2C16.4 2 19 5 19 8.8 19 13 14.4 15.6 12 22 9.6 15.6 5 13 5 8.8 5 5 7.6 2 12 2Z" fill="#FE7A1B"/></svg><span id="petWho">Pinpin</span></span>
+      <span class="round" aria-hidden="true" style="background:transparent"></span>
+    </div>
+    <div class="sbody" id="petBody">
+      <div class="pstats">
+        <div class="pstat"><span class="k">Streak harian</span><span class="v"><span id="pStreakIco"></span><span id="pStreak">0</span><small>hari</small></span><span class="s" id="pStreakNote"></span></div>
+        <div class="pstat r"><span class="k">Total NOO</span><span class="v" id="pTotal">0</span><span class="s" id="pTodayNote"></span></div>
+      </div>
+      <div class="say" id="pSay" aria-live="polite"></div>
+      <div class="big"><button type="button" class="bigHit" id="bigHit"><div class="hopper" id="hopper"></div></button><span class="tapme">ketuk Pinpin</span></div>
+      <div class="pprog"><div class="pbar" id="pBarWrap" role="img"><i id="pBarFill"></i><b id="pBarTxt"></b></div><span class="pcap" id="pBarCap"></span></div>
+      <div class="pcard"><h3>Misi dari Pinpin <span id="pMisiCount"></span></h3><div id="pMissions"></div></div>
+      <div class="pcard"><h3>Lencana streak <span>dapat NOO tiap hari kerja</span></h3><div class="badges" id="pBadges"></div></div>
+    </div>
+    <div class="confetti" id="pConfetti"></div>
+  </section>
+
+  <!-- ============ MODAL ============ -->
+  <div class="scrim" id="popupProspek">
+    <div class="sheetm">
+      <i class="grab"></i>
+      <div class="prospekPin" id="prospekPin" aria-hidden="true"></div>
+      <h2 style="font-size:20px;font-weight:800;text-align:center">Lagi prospek toko baru?</h2>
+      <p class="muted" style="text-align:center;font-size:14px">Kamu berhenti beberapa menit di sini. Mau catat toko yang ada di dekatmu?</p>
+      <div class="bar-actions"><button class="btn gh" onclick="jawabProspekTidak()">Tidak</button><button class="btn or" onclick="jawabProspekYa()">Ya, catat</button></div>
+    </div>
+  </div>
+
+  <div class="scrim" id="modalKatalog" style="z-index:2600;align-items:stretch;background:#EDEFF4">
+    <div id="katWrap" style="display:flex;flex-direction:column;width:100%;height:100%;padding-top:env(safe-area-inset-top,0px)">
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 14px 8px">
+        <div style="flex:1;min-width:0"><h2 style="font-size:17px;font-weight:800;line-height:1.2">Katalog Produk Nabati</h2>
+          <p class="muted" id="katHint" style="font-size:12.5px">Cubit untuk zoom · ketuk 2x untuk perbesar</p></div>
+        <span id="katPg" style="font-size:12px;font-weight:800;background:var(--navy-tint);color:var(--navy);border-radius:99px;padding:5px 10px;flex:none">Hal. 1/2</span>
+        <button type="button" class="round" onclick="tutupKatalog()" style="flex:none;background:#fff" aria-label="Tutup"><svg class="ico" viewBox="0 0 24 24" style="width:18px;height:18px"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+      </div>
+      <div id="katStage" style="position:relative;flex:1;overflow:hidden;touch-action:none;background:#EDEFF4;user-select:none;-webkit-user-select:none">
+        <div id="katContent" style="position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform">
+          <img src="" data-src="katalog/1.jpg" alt="Katalog produk halaman 1" draggable="false" style="width:100%;display:block;pointer-events:none;-webkit-user-drag:none">
+          <img src="" data-src="katalog/2.jpg" alt="Katalog promo halaman 2" draggable="false" style="width:100%;display:block;margin-top:8px;pointer-events:none;-webkit-user-drag:none">
+        </div>
+        <button type="button" id="katReset" onclick="katReset()" style="position:absolute;right:12px;bottom:12px;display:none;border:0;border-radius:99px;background:var(--navy);color:#fff;font-weight:800;font-size:13px;padding:9px 14px;box-shadow:0 6px 18px rgba(31,44,79,.3)">Pas layar</button>
+      </div>
+      <div style="padding:10px 14px calc(12px + env(safe-area-inset-bottom,0px))"><button class="btn or" onclick="tutupKatalog()">Lanjut isi form</button></div>
+    </div>
+  </div>
+
+  <div class="scrim" id="modalManualBackdrop">
+    <div class="sheetm">
+      <i class="grab"></i>
+      <h2 style="font-size:20px;font-weight:800">Buat area uji</h2>
+      <p class="muted" style="font-size:13px">Area ±150×150 m di sekitar lokasi GPS kamu sekarang (khusus tes).</p>
+      <input class="in" type="text" id="manualNama" placeholder="Contoh: Tes depan rumah">
+      <div class="bar-actions"><button class="btn gh" onclick="tutupModalManual()">Batal</button><button class="btn or" id="manualSubmitBtn" onclick="submitAreaManual()">Buat &amp; buka</button></div>
+    </div>
+  </div>
+
+  <div id="toast" role="status"></div>
+  <input type="file" id="fotoInput" accept="image/*" capture="environment" style="display:none" onchange="onPhoto(this)">
+</div>
+
+<script src="lib/leaflet.js"></script>
+<script src="config.js"></script>
+<script src="skypet.js"></script>
+<script src="slselect.js"></script>
+<script src="app.js"></script>
+<script src="jalan.js"></script>
+<script src="pinpin.js"></script>
+<script>SLSelect.init({sheet: true}); startApp();</script>
+</body>
+</html>
