@@ -168,7 +168,7 @@ function jlTandaiKotak(key, r, c, lat, lon, t, diam){
 
 /* --- ringkasan jalan besar --- */
 function jlNamaBesar(rd){
-  if(rd[2]) return rd[2];
+  if(rd[2]) return (typeof namaJalanRapi === 'function') ? namaJalanRapi(rd[2]) : rd[2];
   if(rd[1] === 'tertiary') return 'Jalan kabupaten tanpa nama';
   if(rd[1] === 'primary' || rd[1] === 'secondary' || rd[1] === 'trunk' || rd[1] === 'motorway') return 'Jalan provinsi/nasional tanpa nama';
   return 'Jalan besar tanpa nama';

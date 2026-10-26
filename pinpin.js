@@ -148,7 +148,7 @@
     document.getElementById('pStreak').textContent = rk.streak;
     document.getElementById('pTotal').textContent = rk.total_noo;
     document.getElementById('pStreakIco').innerHTML = flameSvg(rk.streak_nyala, 'flame' + (rk.streak_nyala ? '' : ' off'));
-    document.getElementById('pStreakNote').textContent = rk.streak_nyala ? 'Streak hari ini sudah nyala' : 'Dapat 1 NOO (foto + GPS) biar nggak putus';
+    document.getElementById('pStreakNote').textContent = rk.streak_nyala ? 'Streak hari ini sudah nyala' : 'Dapat NOO setiap hari';
     document.getElementById('pTodayNote').textContent = '+' + n + ' hari ini';
     var pct = Math.min(100, n / T * 100);
     document.getElementById('pBarFill').style.width = pct + '%';
@@ -434,7 +434,7 @@
     var coba = 0;
     (function tunggu(){
       coba++;
-      var siap = splashBeres && screenAktif === 'scrMain' && document.visibilityState !== 'hidden';
+      var siap = splashBeres && screenAktif === 'scrMain' && document.visibilityState !== 'hidden' && (typeof JL === 'undefined' || !!JL.data || coba > 30);   // tunggu data jalan (maks ±4,5 dtk) supaya nama jalan besar ikut tampil
       if(siap || coba > 60) { if(screenAktif === 'scrMain') sambutTampil(); return; }
       setTimeout(tunggu, 150);
     })();

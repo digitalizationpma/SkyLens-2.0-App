@@ -174,9 +174,13 @@ h1,h2,h3,p{margin:0}
 .basemapToggle{display:flex;background:#fff;border-radius:14px;box-shadow:0 4px 14px rgba(28,33,45,.2);overflow:hidden;padding:3px;gap:2px}
 .bmBtn{border:0;background:#fff;padding:7px 12px;font-size:12.5px;font-weight:700;color:var(--muted);border-radius:11px}
 .bmBtn.on{background:var(--navy);color:#fff}
+#compassBtn{position:absolute;right:17px;bottom:calc(var(--shH,120px) + 70px);transition:bottom .18s ease;width:40px;height:40px;border-radius:50%;background:#fff;border:0;box-shadow:0 4px 14px rgba(28,33,45,.2);z-index:880;display:none;align-items:center;justify-content:center;padding:0}
+#compassBtn svg{transition:transform .2s linear}
+#compassBtn.off{opacity:.65}
 #recenterBtn{position:absolute;right:14px;bottom:calc(var(--shH,120px) + 14px);transition:bottom .18s ease;width:46px;height:46px;border-radius:50%;background:#fff;border:0;box-shadow:0 4px 14px rgba(28,33,45,.2);z-index:880;display:none;align-items:center;justify-content:center}
 .mapbanner{position:absolute;left:14px;right:14px;z-index:895;font-size:12.5px;line-height:1.4;padding:9px 12px;border-radius:14px;display:none}
-#gpsLemahBanner{bottom:150px;background:#FFF4E0;border:1px solid #F0C27A;color:#8A4B00}
+#gpsLemahBanner{top:92px;padding:8px 12px;font-size:12.5px;text-align:center;border-radius:14px;background:#FFF4E0;border:1px solid #F0C27A;color:#8A4B00;box-shadow:0 4px 12px rgba(28,33,45,.12)}
+body.gpsLemah .sweepcard{top:140px!important}
 #searchTokoPanel{display:none;position:absolute;left:14px;right:14px;top:14px;background:#fff;border-radius:20px;padding:12px 14px;box-shadow:0 8px 24px rgba(28,33,45,.2);z-index:950;max-height:72%;overflow-y:auto}
 .tokoRes{border:1px solid var(--line);border-radius:12px;padding:9px 11px;margin:7px 0;display:flex;justify-content:space-between;align-items:center}
 .dotT{width:28px;height:28px;border-radius:50%;flex:none;margin-left:8px}
@@ -240,7 +244,9 @@ body.nonav #toast{bottom:24px}
 .pstat .k{font-size:14px;font-weight:700}
 .pstat .v{font-size:52px;font-weight:800;line-height:1;letter-spacing:-.03em;display:flex;align-items:center;gap:6px}
 .pstat .v small{font-size:15px;font-weight:700;color:var(--muted);letter-spacing:0;align-self:flex-end;margin-bottom:6px}
-.pstat.r{align-items:flex-end;text-align:right}
+.pstat.r{align-items:flex-end;text-align:right;flex:none}
+.pstat.r .k{white-space:nowrap}
+.pstat:not(.r){min-width:0;flex:1 1 auto}
 .pstat .s{font-size:12px;color:var(--muted);font-weight:600}
 .flame{width:34px;height:40px}.flame.off{filter:grayscale(1);opacity:.45}
 .big{position:relative;height:240px;display:flex;align-items:center;justify-content:center;margin-top:-6px}
@@ -336,6 +342,9 @@ svg .seg{transform-box:view-box;transform-origin:0 0}
 .prospekPin .qm{position:absolute;right:-2px;top:-2px;width:34px;height:34px;border-radius:50%;background:var(--navy);color:#fff;font:800 20px/34px system-ui,sans-serif;text-align:center;box-shadow:0 4px 12px rgba(31,44,79,.3);animation:qmBob 1.6s ease-in-out infinite}
 @keyframes pinMikir{0%,100%{transform:rotate(-3deg)}50%{transform:rotate(3deg) translateY(-2px)}}
 @keyframes qmBob{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-4px) scale(1.06)}}
+.jksInfo{font-size:12.5px;line-height:1.45;padding:9px 12px;border-radius:14px;background:#F1F3F7;color:#3B4660}
+.jksInfo.on{background:#FFF1E6;color:#6B3200}
+.zonecard.jksHari{border-left:5px solid #FE7A1B}
 .jksChip{display:inline-block;align-self:flex-start;margin-top:3px;padding:2px 8px;border-radius:999px;background:#FFF1E6;color:#B84A00;font-size:11.5px;font-weight:800}
 .mgrsel{width:100%;padding:10px 12px;border:1px solid rgba(120,130,150,.35);border-radius:10px;font-size:15px;font-weight:600;color:var(--ink);background:transparent;margin-bottom:4px}
 </style>
@@ -354,6 +363,7 @@ svg .seg{transform-box:view-box;transform-origin:0 0}
 .tokoTgl i.d{width:11px;height:11px;border-radius:50%;flex:none;border:2px solid #fff;box-shadow:0 0 0 1px rgba(28,33,45,.25)}
 .tokoTgl i.h{width:11px;height:11px;border-radius:50%;flex:none;background:#1FA35B;border:2px solid #fff;box-shadow:0 0 0 1px rgba(28,33,45,.25)}
 .spSedot{background:#E3F6EB;color:#13683A}
+.spJks{background:#E8ECF6;color:#1F2C4F}
 .spNote{font-size:11.5px;color:#9A3A06;background:#FFF7F0;border-radius:10px;padding:7px 9px;line-height:1.35}
 .spAct{margin-top:2px;border:0;border-radius:12px;background:#1F2C4F;color:#fff;font:inherit;font-size:13px;font-weight:800;min-height:40px;cursor:pointer}
 .spGrid{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
@@ -565,12 +575,13 @@ svg .seg{transform-box:view-box;transform-origin:0 0}
     <div class="navcard" id="navcard"></div>
     <!-- sisir -->
     <div class="sweepcard" id="sweepcard"></div>
-    <div class="mapbanner" id="gpsLemahBanner"><b>Sinyal GPS lemah</b> (mungkin di dalam gedung) — posisi ditahan <span id="gpsLemahDetik"></span> supaya jejak tidak ngaco. Keluar ke tempat terbuka sebentar, nanti otomatis jalan lagi.</div>
+    <div class="mapbanner" id="gpsLemahBanner"><b>Sinyal GPS lemah</b>, coba ke tempat terbuka. (<span id="gpsLemahDetik"></span>)</div>
     <div id="searchTokoPanel">
       <input id="qTokoHp" class="in" placeholder="Cari kode/nama toko (cek sebelum catat temuan baru)" autocomplete="off">
       <div id="hintTokoHp" class="muted" style="font-size:12px;margin-top:6px">Ketik minimal 2 huruf/angka</div>
       <div id="listTokoHp" style="margin-top:6px"></div>
     </div>
+    <button id="compassBtn" aria-label="Putar peta mengikuti arah jalan"><svg id="compassIco" width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5 16 12H8z" fill="#E5484D"/><path d="M12 21.5 8 12h8z" fill="#1F2C4F"/><circle cx="12" cy="12" r="1.6" fill="#fff"/></svg></button>
     <button id="recenterBtn" aria-label="Kembali ke posisi kamu"><svg width="22" height="22" viewBox="0 0 24 24"><path d="M12 2.5 L20.5 20.5 L12 16.2 L3.5 20.5 Z" fill="#1F2C4F"/></svg></button>
     <div class="bsheet" id="zoneSheet"></div>
   </section>
@@ -586,7 +597,7 @@ svg .seg{transform-box:view-box;transform-origin:0 0}
     <div class="pgrab"></div>
     <div class="shead">
       <button type="button" class="round" id="petClose" aria-label="Tutup panel"><svg class="ico" viewBox="0 0 24 24" style="width:18px;height:18px"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
-      <span class="chipw"><svg class="pinIco" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C16.4 2 19 5 19 8.8 19 13 14.4 15.6 12 22 9.6 15.6 5 13 5 8.8 5 5 7.6 2 12 2Z" fill="#FE7A1B"/><circle cx="12" cy="8.9" r="2.9" fill="#fff"/></svg><span id="petWho">Pinpin</span></span>
+      <span class="chipw"><span id="petWho">Pinpin</span></span>
       <span class="round" aria-hidden="true" style="background:transparent"></span>
     </div>
     <div class="sbody" id="petBody">
@@ -649,6 +660,7 @@ svg .seg{transform-box:view-box;transform-origin:0 0}
 </div>
 
 <script src="lib/leaflet.js"></script>
+<script src="lib/leaflet-rotate.js"></script>
 <script src="config.js"></script>
 <script src="skypet.js"></script>
 <script src="slselect.js"></script>
