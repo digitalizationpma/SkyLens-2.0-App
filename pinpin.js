@@ -179,7 +179,9 @@
     if(panelBuka() && reaksi == null) renderPanel();
   }
 
+  var bukaAt = 0;   // klik sintetis yang menyusul sentuhan (±300 ms) jatuh ke scrim & langsung menutup panel -> abaikan
   function petBuka(){
+    bukaAt = Date.now();
     tipEl.classList.remove('show');
     renderPanel();
     scrim.classList.add('show'); sheet.classList.add('show'); sheet.setAttribute('aria-hidden', 'false');
@@ -193,12 +195,13 @@
   }
   function hentikanReaksi(){ clearTimeout(reaksiTimer); if(reaksi != null){ reaksi = null; renderBesar(false); } }
 
-  document.getElementById('petClose').addEventListener('click', petTutup);
-  scrim.addEventListener('click', petTutup);
+  document.getElementById('petClose').addEventListener('click', function(){ if(Date.now() - bukaAt > 500) petTutup(); });
+  scrim.addEventListener('click', function(){ if(Date.now() - bukaAt > 500) petTutup(); });
   document.addEventListener('keydown', function(ev){ if(ev.key === 'Escape' && panelBuka()) petTutup(); });
 
   // ketuk Pinpin besar: joget kalau sudah ada NOO, nangis kalau belum
   document.getElementById('bigHit').addEventListener('click', function(){
+    if(Date.now() - bukaAt < 500) return;
     clearTimeout(reaksiTimer);
     reaksi = senang() ? E.joget : E.nangis;
     renderBesar(true);

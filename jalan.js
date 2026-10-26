@@ -228,8 +228,15 @@ function jlMisi(){
 /* --- gambar di peta --- */
 function jlGambarRuas(petaMap, key, grp){
   if(!JL.data || !jlPetak(key)) return null;
-  const rnd = JL.rnd || (JL.rnd = L.canvas({padding: 0.3}));
+  /* satu renderer canvas PER PETA (dulu dipakai bersama oleh dua peta -> kanvas ikut peta lain, jalan & petak melebar saat zoom) */
+  if(!petaMap._jlRnd){
+    const pn = petaMap.getPane('jalanPane') || petaMap.createPane('jalanPane');
+    pn.style.zIndex = 390; pn.style.pointerEvents = 'none';
+    petaMap._jlRnd = L.canvas({padding: 0.3, pane: 'jalanPane'});
+  }
+  const rnd = petaMap._jlRnd;
   const g = grp || L.layerGroup();
+  g._jlRnd = rnd;
   const urut = jlRuasPetak(key).slice().sort((a, b) => 'TMQB'.indexOf(JL.data.roads[a][0]) - 'TMQB'.indexOf(JL.data.roads[b][0]));
   urut.forEach(ri => {
     const rd = JL.data.roads[ri], f = rd[3], ll = [];
@@ -248,7 +255,7 @@ function jlGambarRuas(petaMap, key, grp){
 }
 function jlGambarPotongan(g, q){
   if(g._jlDrawn.has(q.id)) return; g._jlDrawn.add(q.id);
-  L.polyline([q.a, q.b], {renderer: JL.rnd, color: JL_WARNA.makan, weight: q.kat === 'B' ? 6 : 4.5, opacity: 1, lineCap: 'round', interactive: false}).addTo(g._jlMakan);
+  L.polyline([q.a, q.b], {renderer: g._jlRnd, color: JL_WARNA.makan, weight: q.kat === 'B' ? 6 : 4.5, opacity: 1, lineCap: 'round', interactive: false}).addTo(g._jlMakan);
 }
 function jlGambarMakan(baru){
   [JL.lapZona, JL.lapAll].forEach(g => { if(g && g._jlMakan) baru.forEach(q => { if(jlRuasPetak(g._jlKey).indexOf(q.ri) >= 0) jlGambarPotongan(g, q); }); });

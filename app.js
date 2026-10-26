@@ -303,11 +303,9 @@ function resetNama(){
   const sel = $('kodeInput'); sel.innerHTML = '<option value="">Pilih area dulu</option>'; sel.disabled = true;
   $('fldNama').classList.add('dis'); $('fldNama').classList.remove('on'); $('btnMasuk').disabled = true;
 }
+/* RBM/BM/ASS tidak ada di aplikasi (mereka masuk lewat dashboard). Buang dari daftar nama, apa pun sumbernya (bawaan, cache, Supabase). */
 function gabungManajer(dep, r){
-  if(typeof MANAJER === 'undefined') return r;
-  const ada = new Set(r.map(x => x[0]));
-  Object.keys(MANAJER).forEach(k => { if(!ada.has(k) && MANAJER[k].depot.indexOf(dep) >= 0) r.push([k, MANAJER[k].nama]); });
-  return r;
+  return r.filter(x => !/^(RBM|BM|ASS)\s*-/i.test(String((x && x[1]) || '').trim()) && !/^(RBM|BM|ASS)-/i.test(String((x && x[0]) || '')));
 }
 async function muatRoster(dep){
   const bawaan = (ROSTER[dep] || []).map(s => [String(s[0]), s[1]]);
@@ -655,6 +653,32 @@ function segKotakHtml(n, N, gaya){
 }
 function teksKotak(n, N){ return N ? n + '/' + N : 'tanpa permukiman'; }
 
+/* ---- penugasan otomatis dari JKS ---- */
+function petakOtomatis(kode){
+  const by = new Map();   // key petak -> {kode: [jumlah, omset]}
+  OUTLET.forEach(o => {
+    if(!o[8]) return;
+    const key = keyDari(Math.floor(o[1] / S + 1e-9), Math.floor(o[0] / S + 1e-9));
+    let m = by.get(key); if(!m){ m = {}; by.set(key, m); }
+    const e = m[o[8]] || (m[o[8]] = [0, 0]); e[0]++; e[1] += (+o[4] || 0);
+  });
+  const hasil = [];
+  const bagus = OUTLET.filter(o => o[8]);
+  AREA.zona.forEach(z => {
+    const key = keyDari(z[2], z[3]), m = by.get(key);
+    let pemilik = null;
+    if(m){
+      const ks = Object.keys(m).sort((a, b) => (m[b][0] - m[a][0]) || (m[b][1] - m[a][1]));
+      pemilik = ks[0];
+    } else if(z[23] === 1 || z[23] === 2){   // petak prioritas A/B tanpa toko -> sales dengan toko JKS terdekat
+      const cla = z[3] * S + S / 2, clo = z[2] * S + S / 2, kc = Math.cos(cla * Math.PI / 180);
+      let bd = 1e18;
+      bagus.forEach(o => { const dy = o[0] - cla, dx = (o[1] - clo) * kc, d = dy * dy + dx * dx; if(d < bd){ bd = d; pemilik = o[8]; } });
+    }
+    if(pemilik != null && String(pemilik) === kode) hasil.push(z);
+  });
+  return hasil;
+}
 async function muatDaftarZona(){
   zonaState = {mode: 'memuat', pesan: ''}; segarkanLayarAktif();
   await muatDataArea(sesi.depot);
@@ -678,6 +702,11 @@ async function muatDaftarZona(){
   (tugas.grid || []).forEach(g => gridSet.add(g[0] + ':' + g[1] + ':' + g[2]));
   lsSet('sl2_grid_' + sesi.kode, Array.from(gridSet));
   zonaList = (tugas.petak || []).map(k => zonaDariKey(Number(k)));
+  /* penugasan otomatis dari JKS: petak yang paling banyak toko AS-IS-nya milik sales ini (+ petak A/B tanpa toko -> sales JKS terdekat). Penugasan manual dari dashboard tetap ikut. */
+  try{
+    const ada = new Set(zonaList.map(z => keyDari(z[2], z[3])));
+    petakOtomatis(String(sesi.kode)).forEach(z => { const k = keyDari(z[2], z[3]); if(!ada.has(k)){ ada.add(k); zonaList.push(z); } });
+  }catch(e){ console.error('petakOtomatis', e); }
   if(sesi && sesi.depot === 'TESTING' && !zonaList.length) zonaList = Object.keys(zonaMap).map(k => zonaMap[k]).filter(Boolean);   // depo uji: kalau belum ditugaskan dari dashboard, 4 petak uji langsung tersedia
   manualList = tugas.area_manual || [];
   if(typeof jlSiapkanIndeks === 'function') jlSiapkanIndeks();
@@ -1041,13 +1070,51 @@ function renderAkun(){
 /* ============================================================
    PETA SEMUA ZONA (tab Peta)
    ============================================================ */
+const SHEET_PEEK = 64;      // tinggi yang masih kelihatan saat sheet dilipat (pegangan + baris pertama)
+const sheetLipat = {};      // id sheet -> true kalau sedang dilipat (bertahan walau isinya dirender ulang)
+function sheetOff(sh){ return sheetLipat[sh.id] ? Math.max(0, sh.offsetHeight - SHEET_PEEK) : 0; }
+function sheetTerapkan(sh, host, off){
+  sh.style.transform = off ? 'translateY(' + off + 'px)' : '';
+  host.style.setProperty('--shH', Math.max(SHEET_PEEK, Math.ceil(sh.offsetHeight - off)) + 'px');
+}
+function sheetBuka(id){ const sh = document.getElementById(id); if(!sh) return; sheetLipat[id] = false; if(sh.__ukurSet) sh.__ukurSet(); }
 function ukurSheet(sheetId, hostId){
   const sh = document.getElementById(sheetId), host = document.getElementById(hostId); if(!sh || !host || sh.__ukur) return;
   sh.__ukur = true;
-  const set = () => host.style.setProperty('--shH', Math.ceil(sh.getBoundingClientRect().height) + 'px');
+  const set = () => { if(!sh.__drag) sheetTerapkan(sh, host, sheetOff(sh)); };
+  sh.__ukurSet = set;
   if(window.ResizeObserver) new ResizeObserver(set).observe(sh);
-  new MutationObserver(set).observe(sh, {childList: true, subtree: true, attributes: true});
+  new MutationObserver(set).observe(sh, {childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style']});
   set();
+  /* geser pegangan: ke bawah = dilipat, ke atas = dibuka; ketuk pegangan = tukar */
+  sh.addEventListener('pointerdown', ev => {
+    const g = ev.target.closest && ev.target.closest('.grab'); if(!g || !sh.contains(g)) return;
+    try{ sh.setPointerCapture(ev.pointerId); }catch(e){}
+    const maxOff = Math.max(0, sh.offsetHeight - SHEET_PEEK);
+    sh.__drag = {y0: ev.clientY, off0: sheetOff(sh), maxOff: maxOff, moved: false, lastY: ev.clientY, lastT: performance.now(), v: 0, id: ev.pointerId};
+    sh.classList.add('dragging');
+  });
+  sh.addEventListener('pointermove', ev => {
+    const d = sh.__drag; if(!d || ev.pointerId !== d.id) return;
+    const dy = ev.clientY - d.y0;
+    if(!d.moved && Math.abs(dy) > 5) d.moved = true;
+    if(!d.moved) return;
+    const now = performance.now(); d.v = (ev.clientY - d.lastY) / Math.max(1, now - d.lastT); d.lastY = ev.clientY; d.lastT = now;
+    sheetTerapkan(sh, host, Math.max(0, Math.min(d.maxOff, d.off0 + dy)));
+  });
+  const akhir = ev => {
+    const d = sh.__drag; if(!d || (ev && ev.pointerId !== d.id)) return;
+    sh.__drag = null; sh.classList.remove('dragging');
+    try{ sh.releasePointerCapture(d.id); }catch(e){}
+    if(!d.moved) sheetLipat[sheetId] = !sheetLipat[sheetId];
+    else {
+      const cur = Math.max(0, Math.min(d.maxOff, d.off0 + (d.lastY - d.y0)));
+      sheetLipat[sheetId] = d.v > 0.5 ? true : (d.v < -0.5 ? false : cur > d.maxOff / 2);
+    }
+    set();
+  };
+  sh.addEventListener('pointerup', akhir);
+  sh.addEventListener('pointercancel', akhir);
 }
 function pasangBasemapToggle(petaMap, hybridLayer){
   ukurSheet('zoneSheet', 'scrPeta'); ukurSheet('allSheet', 'tabPeta');
@@ -1082,6 +1149,7 @@ function petaSemuaTampil(){
   if(!mapAll){
     const c = (sesi && MANIFEST[sesi.depot]) ? MANIFEST[sesi.depot].center : [-7.2, 107.9];
     mapAll = L.map('mapAll', {zoomControl: false, attributionControl: false}).setView(c, 12);
+    mapAll.on('popupopen', e => ajusPopup(mapAll, e.popup));
     siapkanPane(mapAll);
     const hy = buatHybrid().addTo(mapAll); pasangBasemapToggle(mapAll, hy);
     if(typeof jlLegenda === 'function') jlLegenda(mapAll);
@@ -1150,6 +1218,7 @@ function tokoAllGambar(){
 }
 function petaSemuaSheet(){
   const sh = $('allSheet'); if(!sh) return;
+  if(sh.__selSig !== allSel){ sh.__selSig = allSel; if(sheetLipat.allSheet) sheetBuka('allSheet'); }
   let h = '<i class="grab"></i>';
   if(allSel < 0 || !zonaList[allSel]){
     h += '<div class="col" style="gap:2px;padding:4px 0 2px"><b style="font-size:16px">' + (zonaList.length ? 'Ketuk kotak oranye untuk memilih zona' : 'Belum ada zona di peta') + '</b><span class="muted" style="font-size:13px">' + (zonaList.length ? zonaList.length + ' zona ditugaskan ke kamu' : 'Zona akan muncul setelah penugasan dari atasan') + '</span></div>';
@@ -1206,6 +1275,7 @@ function siapkanLayarPeta(){
 function buatPeta(zoom){
   if(map){ map.remove(); map = null; }
   map = L.map('map', {zoomControl: false, attributionControl: false}).setView([CENTER.lat, CENTER.lon], zoom);
+  map.on('popupopen', e => ajusPopup(map, e.popup));
   siapkanPane(map);
   const hybrid = buatHybrid().addTo(map);
   pasangBasemapToggle(map, hybrid);
@@ -1218,7 +1288,22 @@ function buatPeta(zoom){
 }
 
 /* Popup toko bermerek SkyLens (kartu, bukan popup bawaan Leaflet) */
-const POPUP_OPT = {className: 'slPop', maxWidth: 320, minWidth: 280, closeButton: true};
+/* popup toko: geser peta supaya popup tidak tertutup kartu atas / sheet bawah (dihitung saat popup terbuka, bukan saat dibuat) */
+function ajusPopup(m, popup){
+  setTimeout(() => {
+    const el = popup && popup.getElement && popup.getElement(); if(!el || !m || !m._container) return;
+    const hr = m.getContainer().getBoundingClientRect(), r = el.getBoundingClientRect();
+    const atas = hr.top + batasAtasPeta() + 10, bawah = hr.bottom - batasBawahPeta() - 12;
+    let dy = 0;
+    if(r.bottom > bawah) dy = r.bottom - bawah;
+    if(r.top - dy < atas) dy = r.top - atas;     // prioritas: judul popup tetap kelihatan
+    let dx = 0;
+    if(r.right > hr.right - 12) dx = r.right - (hr.right - 12);
+    if(r.left - dx < hr.left + 12) dx = r.left - (hr.left + 12);
+    if(Math.abs(dy) > 2 || Math.abs(dx) > 2) m.panBy([dx, dy], {animate: true, duration: 0.25});
+  }, 60);
+}
+const POPUP_OPT = {className: 'slPop', maxWidth: 340, minWidth: 290, closeButton: true};
 /* padding autoPan dihitung saat popup dibuka: popup tidak boleh tertutup kartu atas / sheet bawah */
 Object.defineProperty(POPUP_OPT, 'autoPanPaddingTopLeft', {enumerable: true, get(){ return L.point(16, batasAtasPeta() + 12); }});
 Object.defineProperty(POPUP_OPT, 'autoPanPaddingBottomRight', {enumerable: true, get(){ return L.point(16, batasBawahPeta() + 58); }});
@@ -1252,9 +1337,16 @@ function kpiToko(o){
   const ec = Math.max(0.4, Math.min(8, om / 110000 + r * 0.8)), roa = Math.max(0.2, Math.min(4, om / 260000 + r * 0.6));
   return {ec: ec, roa: roa, contoh: true};
 }
+function salesCoverHtml(o){
+  const nm = namaBersih(o[9] || ''), kd = String(o[8] || '');
+  if(!nm && !kd) return '<div class="spSales kosong"><div class="av">?</div><div class="tx"><span>Sales cover</span><b>Belum ada sales (di luar JKS)</b></div></div>';
+  const ini = (nm || kd).split(/\s+/).slice(0, 2).map(w => w[0] || '').join('').toUpperCase();
+  const saya = sesi && String(sesi.kode || '') === kd;
+  return '<div class="spSales"><div class="av">' + esc(ini) + '</div><div class="tx"><span>Sales cover' + (saya ? ' · kamu' : '') + '</span><b>' + esc(nm || kd) + '</b>' + (kd ? '<em>' + esc(kd) + '</em>' : '') + '</div></div>';
+}
 function popupToko(o){
   const t = String(o[2] || '').toUpperCase(), warna = ({A: '#a53838', B: '#e08e2b', C: '#2a5a7a'})[o[2]] || '#7f8c8d';
-  const sed = tokoSedotan(o), milik = tokoMilikSaya(o), k = kpiToko(o);
+  const sed = tokoSedotan(o), k = kpiToko(o);
   return '<div class="spB">' +
     '<div class="spHead"><span class="spNama">' + esc(o[7] || '-') + '</span><span class="spKode">' + esc(o[6] || '') + '</span></div>' +
     '<div class="spChips"><span class="spChip" style="background:' + warna + ';color:#fff">Tier ' + esc(t || '-') + '</span>' + (o[3] ? '<span class="spChip spTipe">' + esc(o[3]) + '</span>' : '') +
@@ -1264,7 +1356,7 @@ function popupToko(o){
       '<div><span>Avg. EC P3M</span><b>' + (k.ec != null ? angka1(k.ec) : '—') + '</b></div>' +
       '<div><span>Avg. ROA P3M</span><b>' + (k.roa != null ? angka1(k.roa) : '—') + '</b></div>' +
     '</div>' +
-    (milik ? '' : '<div class="spKode" style="font-family:inherit">Sales: ' + esc(o[9] || '—') + '</div>') +
+    salesCoverHtml(o) +
     (sed ? '<div class="spCiri"><i></i>Ciri Toko Sedotan</div>' : '') +
   '</div>';
 }
@@ -1308,12 +1400,16 @@ function bukaZona(z){
   siapkanLayarPeta();
   $('zoneTitle').textContent = z[11] || ('Petak ' + key);
   const pr = NAMA_PRIO[z[23]] || '-';
-  $('zoneSub').textContent = kecZona(z) + ' · Petak ' + key + ' · Prioritas ' + pr;
+  $('zoneAddr').textContent = kecZona(z) + ' · Petak ' + key + ' · Prioritas ' + pr;
+  $('topcardNav').classList.remove('open'); $('zoneSub').dataset.sig = '';
   LON0 = z[2]*S; LAT0 = z[3]*S; LON1 = LON0 + S; LAT1 = LAT0 + S;
   CENTER = {lat: (LAT0+LAT1)/2, lon: (LON0+LON1)/2};
   cellLon = (LON1-LON0)/GRID_N; cellLat = (LAT1-LAT0)/GRID_N;
   buatPeta(16);
-  L.rectangle([[LAT0, LON0], [LAT1, LON1]], {color: '#FE7A1B', weight: 3, fillColor: '#FE7A1B', fillOpacity: 0.1, pane: 'petakPane'}).addTo(map);
+  /* batas petak: pinggiran putih (casing) + garis oranye tebal, supaya jelas di atas citra satelit & jalan */
+  L.rectangle([[LAT0, LON0], [LAT1, LON1]], {color: '#ffffff', weight: 7, opacity: 0.9, fill: false, interactive: false, pane: 'petakPane'}).addTo(map);
+  L.rectangle([[LAT0, LON0], [LAT1, LON1]], {color: '#FE7A1B', weight: 4, fillColor: '#FE7A1B', fillOpacity: 0.12, interactive: false, pane: 'petakPane'}).addTo(map);
+  petakLbl = L.marker([LAT1, (LON0 + LON1) / 2], {interactive: false, keyboard: false, zIndexOffset: 500, icon: L.divIcon({className: '', iconSize: [0, 0], html: '<div class="petakLbl">PETAK TUJUAN</div>'})});
   if(typeof jlGambarRuas === 'function') JL.lapZona = jlGambarRuas(map, key);
   gambarTokoDalam();
   buatKotak(); tandaiKotakDariGrid();
@@ -1322,9 +1418,11 @@ function bukaZona(z){
   renderPosisi(true);
 }
 function bukaAreaManual(a){
+  petakLbl = null;
   siapkanLayarPeta();
   $('zoneTitle').textContent = a.name || 'Area manual';
-  $('zoneSub').textContent = a.reason || 'Area gambar bebas dari dashboard';
+  $('zoneAddr').textContent = a.reason || 'Area gambar bebas dari dashboard';
+  $('topcardNav').classList.remove('open'); $('zoneSub').dataset.sig = '';
   const gj = L.geoJSON(a.geojson); const b = gj.getBounds(); const ctr = b.getCenter();
   CENTER = {lat: ctr.lat, lon: ctr.lng};
   zonaAktif = {key_petak: hashKeyAreaManual(a.id), kecamatan: a.name || 'Area manual', kabupaten: '(area manual)', gx: 0, gy: 0, manual: true, z: null};
@@ -1490,6 +1588,13 @@ function prosesSisir(lat, lon, t){
   cellLastT = t;
 }
 
+let petakLbl = null;
+function setSubNav(html){ const el = $('zoneSub'); if(el && el.dataset.sig !== html){ el.innerHTML = html; el.dataset.sig = html; } }
+function tapKartuNav(){
+  const c = $('topcardNav'); c.classList.toggle('open');
+  if(c.classList.contains('open')){ clearTimeout(tapKartuNav.t); tapKartuNav.t = setTimeout(() => c.classList.remove('open'), 6000); }
+  if(document.body.classList.contains('menuju')) panKeZonaAktif();
+}
 function renderPosisi(paksa){
   if(!map || !zonaAktif) return;
   const sw = $('sweepcard'), nv = $('navcard'), zs = $('zoneSheet');
@@ -1520,6 +1625,8 @@ function renderPosisi(paksa){
   document.body.classList.toggle('menuju', !dalam);
   if(dalam){
     nv.style.display = 'none'; sw.style.display = 'flex';
+    setSubNav('<i class="gdot ok"></i>Di dalam zona' + (N ? ' <span class="sep">•</span> ' + n + '/' + N + ' kotak' : ''));
+    if(petakLbl && petakLbl._map) map.removeLayer(petakLbl);
     const z = zonaAktif.z;
     const sisa = N - n, adaJl = !!(keyZ && typeof jlPetak === 'function' && jlPetak(keyZ));
     const html = (N ? '<div class="row" style="justify-content:space-between"><span style="font-size:13px;font-weight:700;color:var(--navy)">Kamu di dalam zona</span>' + (sisa ? '<span style="font-size:13px;font-weight:800;color:var(--orange-ink)">Sisa ' + sisa + ' kotak</span>' : '<span style="font-size:13px;font-weight:800;color:var(--navy)">Semua kotak selesai ✓</span>') + '</div>' +
@@ -1530,7 +1637,7 @@ function renderPosisi(paksa){
       (adaJl ? jlKartuHtml(keyZ, zInfoOpen) : '') +
       (z ? '<button type="button" onclick="zInfoOpen=!zInfoOpen;renderPosisi()" style="border:0;background:var(--ground);border-radius:12px;padding:10px;font-size:13px;font-weight:700;min-height:42px">' + (adaJl ? 'Nama jalan & info zona ' : 'Info zona lengkap ') + (zInfoOpen ? '▲' : '▼') + '</button>' + (zInfoOpen ? infoZonaHtml(z) : '') : '');
     if(sw.dataset.sig !== html){ sw.innerHTML = html; sw.dataset.sig = html; }
-    const sh = '<div class="bar-actions"><button class="btn or" style="flex:2" onclick="bukaWizard()">' + ico('plus', 'stroke-width:2.4') + 'Catat temuan</button><button class="btn gh" style="flex:1;white-space:nowrap" onclick="toggleSearchToko()">' + ico('search') + 'Cek toko</button></div>';
+    const sh = '<i class="grab"></i><div class="bar-actions"><button class="btn or" style="flex:2" onclick="bukaWizard()">' + ico('plus', 'stroke-width:2.4') + 'Catat temuan</button><button class="btn gh" style="flex:1;white-space:nowrap" onclick="toggleSearchToko()">' + ico('search') + 'Cek toko</button></div>';
     if(zs.dataset.sig !== sh){ zs.innerHTML = sh; zs.dataset.sig = sh; }
   } else {
     sw.style.display = 'none'; nv.style.display = 'flex';
@@ -1539,10 +1646,12 @@ function renderPosisi(paksa){
       const b = {lat0: LAT0, lat1: LAT1, lon0: LON0, lon1: LON1};
       const p = titikTerdekat(b, lastPos.lat, lastPos.lon);
       const d = haversine(lastPos.lat, lastPos.lon, p.lat, p.lon);
-      $('disttext').textContent = fmtJarak(d);
-      $('etatext').textContent = 'ke tepi zona · ' + etaTeks(d);
-      $('navArrow').style.transform = 'rotate(' + Math.round(bearing(lastPos.lat, lastPos.lon, p.lat, p.lon)) + 'deg)';
-    } else { $('disttext').textContent = '…'; $('etatext').textContent = 'mencari lokasi GPS…'; }
+      const rot = Math.round(bearing(lastPos.lat, lastPos.lon, p.lat, p.lon));
+      const mnt = Math.max(1, Math.round((d * FAKTOR_JALAN) / (KECEPATAN_MOTOR_KMH * 1000 / 60)));
+      setSubNav('<svg class="narr" viewBox="0 0 24 24" style="transform:rotate(' + rot + 'deg)" aria-hidden="true"><path d="M12 3v18M12 3l-6 6M12 3l6 6" fill="none" stroke="#FE7A1B" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+        fmtJarak(d) + (d < 40 ? ' <span class="sep">•</span> hampir sampai' : ' <span class="sep">•</span> ' + mnt + ' menit <span class="sep">•</span> Motor'));
+    } else { setSubNav('<i class="gdot"></i>Mencari lokasi GPS…'); }
+    if(petakLbl && !petakLbl._map && map) petakLbl.addTo(map);
     const stat = z
       ? '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px"><div class="stat cp"><span>Bangunan</span><b>' + (z[4] || 0).toLocaleString('id-ID') + '</b></div><div class="stat cp"><span>Toko terdaftar</span><b>' + (z[6] || 0) + '</b></div><div class="stat cp"><span>Disisir</span><b>' + teksKotak(n, N) + '</b></div></div>'
       : '<div class="stat cp"><span>Disisir</span><b>' + teksKotak(n, N) + '</b></div>';

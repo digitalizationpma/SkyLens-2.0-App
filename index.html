@@ -431,6 +431,51 @@ svg .seg{transform-box:view-box;transform-origin:0 0}
 #sambut .sbFade{animation:sbFade .3s ease-out}
 @keyframes sbFade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 #sambut.out .sbFly{transition:none;opacity:1}
+
+/* ===== putaran 26 Okt: kartu navigasi tunggal, popup toko lega, sheet bisa digeser, tombol (+) tidak terpotong ===== */
+.topcard.navtop{background:var(--navy);color:#fff;padding:0 10px;height:68px;gap:10px;box-shadow:0 8px 22px rgba(20,28,55,.30);box-sizing:border-box}
+.navtop .ibtn{width:44px;height:44px;border-radius:14px;background:rgba(255,255,255,.14);color:#fff}
+.navtop .ibtn .ico{stroke:#fff}
+.navtop .ntxt{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;justify-content:center;cursor:pointer;height:100%}
+.navtop .ntxt b{font-size:16px;line-height:1.15;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.navtop .nsub,.navtop .naddr{font-size:12.5px;line-height:1.2;color:#C9D0DE;font-weight:600;display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.navtop .naddr{display:none}
+.navtop.open .nsub{display:none}
+.navtop.open .naddr{display:block}
+.nsub .narr{width:15px;height:15px;flex:none;transition:transform .4s}
+.nsub .sep{opacity:.55}
+.gdot{width:9px;height:9px;border-radius:50%;background:var(--orange);flex:none;display:inline-block;animation:gdotp 1.15s ease-in-out infinite}
+.gdot.ok{background:#36D399;animation:none}
+@keyframes gdotp{0%,100%{transform:scale(.7);opacity:.55}50%{transform:scale(1.15);opacity:1}}
+@media (prefers-reduced-motion:reduce){.gdot{animation:none}}
+.sweepcard{top:92px!important;max-height:calc(100% - 250px)!important}
+.navcard{display:none!important}
+.petakLbl{width:max-content;background:var(--navy);color:#fff;font:800 11.5px/1 system-ui,sans-serif;letter-spacing:.04em;padding:6px 10px;border-radius:99px;white-space:nowrap;box-shadow:0 3px 10px rgba(20,28,55,.3);border:2px solid #fff;transform:translate(-50%,-100%)}
+/* popup toko */
+.slPop .leaflet-popup-content{width:300px!important;max-width:calc(100vw - 44px)!important}
+.spB{padding:16px!important;gap:10px!important}
+.spHead{padding-right:30px;flex-direction:column;gap:2px;align-items:flex-start!important}
+.spB .spNama{font-size:16px}
+.spKpi{display:grid!important;grid-template-columns:repeat(3,1fr)!important;gap:8px!important;border-top:0!important;padding-top:0!important;margin-right:0!important;justify-content:stretch!important}
+.spKpi div{background:var(--ground,#F4F6F9);border-radius:12px;padding:9px 6px 8px;align-items:center;text-align:center;gap:3px!important}
+.spKpi span{font-size:10.5px!important;white-space:normal!important;color:var(--muted,#5B6478)}
+.spKpi b{font-size:15px!important}
+.spSales{display:flex;align-items:center;gap:10px;border-top:1px solid var(--line,#E7EBF2);padding-top:10px}
+.spSales .av{width:30px;height:30px;border-radius:50%;background:var(--navy,#1F2C4F);color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none}
+.spSales .tx{display:flex;flex-direction:column;min-width:0;gap:1px}
+.spSales .tx span{font-size:10.5px;font-weight:700;color:var(--muted,#5B6478);letter-spacing:.04em;text-transform:uppercase}
+.spSales .tx b{font-size:13.5px;font-weight:800;line-height:1.25;word-break:break-word}
+.spSales .tx em{font-style:normal;font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--muted,#5B6478)}
+.spSales.kosong .av{background:#C9D0DE}
+/* sheet bawah: pegangan geser + (+) tidak terpotong */
+.bsheet{touch-action:pan-y;transition:transform .22s cubic-bezier(.2,.8,.2,1);will-change:transform}
+.bsheet.dragging{transition:none}
+.bsheet,.bsheet .grab{-webkit-user-select:none;user-select:none}
+.bsheet .btn,.bsheet b,.bsheet span{-webkit-user-select:text}
+.bsheet .grab{position:relative;cursor:grab;touch-action:none;width:48px;height:5px;margin:2px auto 4px}
+.bsheet .grab::before{content:"";position:absolute;left:-70px;right:-70px;top:-14px;bottom:-14px}
+#allSheet{padding-bottom:40px}
+.bnav{z-index:1000}
 </style>
 </head>
 <body>
@@ -511,16 +556,13 @@ svg .seg{transform-box:view-box;transform-origin:0 0}
   <!-- ============ PETA ZONA (menuju / sisir) ============ -->
   <section id="scrPeta" class="scr">
     <div style="position:absolute;inset:0"><div id="map"></div></div>
-    <div class="topcard">
+    <!-- kartu navigasi tunggal (navy): judul area + status jarak/GPS; ketuk = alamat -->
+    <div class="topcard navtop" id="topcardNav">
       <button class="ibtn" onclick="kembaliKeDaftar()" aria-label="Kembali"><svg class="ico" viewBox="0 0 24 24"><path d="M15 5 8 12l7 7"/></svg></button>
-      <div class="col" style="flex:1;min-width:0"><b id="zoneTitle" style="font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">—</b><span id="zoneSub" class="muted" style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">—</span></div>
+      <div class="ntxt" id="navTxt" onclick="tapKartuNav()" role="button" tabindex="0" aria-label="Info zona"><b id="zoneTitle">—</b><span id="zoneSub" class="nsub"><i class="gdot"></i>Mencari lokasi GPS…</span><span id="zoneAddr" class="naddr"></span></div>
       <button class="ibtn" id="searchToggleBtn" onclick="toggleSearchToko()" aria-label="Cek toko"><svg class="ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
     </div>
-    <!-- menuju -->
-    <div class="navcard" id="navcard" onclick="panKeZonaAktif()">
-      <div class="arr"><svg id="navArrow" viewBox="0 0 24 24" style="width:34px;height:34px;transition:transform .4s"><path d="M12 3v18M12 3l-6 6M12 3l6 6" fill="none" stroke="#FE7A1B" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <div class="col" style="gap:2px"><b id="disttext" style="font-size:32px;line-height:1">…</b><span id="etatext" style="font-size:13px;color:#C9D0DE">mencari lokasi…</span></div>
-    </div>
+    <div class="navcard" id="navcard"></div>
     <!-- sisir -->
     <div class="sweepcard" id="sweepcard"></div>
     <div class="mapbanner" id="gpsLemahBanner"><b>Sinyal GPS lemah</b> (mungkin di dalam gedung) — posisi ditahan <span id="gpsLemahDetik"></span> supaya jejak tidak ngaco. Keluar ke tempat terbuka sebentar, nanti otomatis jalan lagi.</div>
