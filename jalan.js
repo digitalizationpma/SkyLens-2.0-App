@@ -113,17 +113,32 @@ function jlSiapkanIndeks(){
       let arr = h.get(bk); if(!arr){ arr = []; h.set(bk, arr); } arr.push(q);
     });
   }));
-  JL.hash = h;
+  JL.hash = h; JL.prev = null;
   // titik yang sudah terkumpul sebelum indeks siap ikut dihitung
   trailPoints.forEach(p => jlProsesFix(p.lat, p.lon, 10, p.t, true));
 }
 function jlProsesFix(lat, lon, acc, t, diam){
   if(!JL.hash || (acc && acc > JL_AKURASI_MAKS)) return;
-  const bi = Math.floor(lat / JL_BUCKET), bj = Math.floor(lon / JL_BUCKET), baru = [];
-  for(let di = -1; di <= 1; di++) for(let dj = -1; dj <= 1; dj++){
-    const arr = JL.hash.get((bi+di) + ':' + (bj+dj)); if(!arr) continue;
-    for(const q of arr){ if(!JL.done.has(q.id) && haversine(lat, lon, q.m[0], q.m[1]) <= JL_RADIUS_M){ JL.done.add(q.id); baru.push(q); } }
+  const baru = [];
+  const cek = (la, lo) => {
+    const bi = Math.floor(la / JL_BUCKET), bj = Math.floor(lo / JL_BUCKET);
+    for(let di = -1; di <= 1; di++) for(let dj = -1; dj <= 1; dj++){
+      const arr = JL.hash.get((bi+di) + ':' + (bj+dj)); if(!arr) continue;
+      for(const q of arr){ if(!JL.done.has(q.id) && haversine(la, lo, q.m[0], q.m[1]) <= JL_RADIUS_M){ JL.done.add(q.id); baru.push(q); } }
+    }
+  };
+  /* GPS motor jarang rapat (tiap fix bisa 30-60 m). Garis jejak yang tersambung antar-dua titik juga dihitung "dimakan",
+     jadi jalan tidak bolong padahal garis tealnya sudah lewat. Titik antara dibuat tiap ≤8 m; celah >200 m atau >100 dtk tidak disambung. */
+  const pv = JL.prev;
+  if(pv && t > pv.t && (t - pv.t) < 100000){
+    const d = haversine(pv.lat, pv.lon, lat, lon);
+    if(d > 8 && d <= 200){
+      const n = Math.ceil(d / 8);
+      for(let i = 1; i < n; i++) cek(pv.lat + (lat - pv.lat) * i / n, pv.lon + (lon - pv.lon) * i / n);
+    }
   }
+  cek(lat, lon);
+  JL.prev = {lat: lat, lon: lon, t: t};
   if(!baru.length) return;
   JL.ver++;
   jlGambarMakan(baru);
@@ -230,7 +245,7 @@ function jlGambarRuas(petaMap, key, grp){
   if(!JL.data || !jlPetak(key)) return null;
   /* satu renderer canvas PER PETA (dulu dipakai bersama oleh dua peta -> kanvas ikut peta lain, jalan & petak melebar saat zoom) */
   if(!petaMap._jlRnd){
-    const pn = petaMap.getPane('jalanPane') || petaMap.createPane('jalanPane');
+    const pn = petaMap.getPane('jalanPane') || petaMap.createPane('jalanPane', petaMap._rotatePane || undefined);
     pn.style.zIndex = 390; pn.style.pointerEvents = 'none';
     petaMap._jlRnd = L.canvas({padding: 0.3, pane: 'jalanPane'});
   }

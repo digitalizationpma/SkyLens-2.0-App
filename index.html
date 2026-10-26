@@ -162,6 +162,12 @@ h1,h2,h3,p{margin:0}
 .topcard{position:absolute;left:14px;right:14px;top:14px;z-index:900;background:#fff;border-radius:20px;padding:8px 12px 8px 8px;box-shadow:0 6px 18px rgba(28,33,45,.16);display:flex;align-items:center;gap:10px}
 .navcard{position:absolute;left:14px;right:14px;top:84px;z-index:890;background:var(--navy);color:#fff;border-radius:20px;padding:14px 16px;display:none;gap:14px;align-items:center}
 .navcard .arr{width:60px;height:60px;border-radius:50%;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;flex:none}
+.swMini{flex:none;display:flex;align-items:center;gap:10px;width:100%;border:0;background:none;padding:0;font:inherit;color:var(--navy);min-height:30px;text-align:left}
+.swMini b{font-size:15px;font-weight:800;white-space:nowrap}
+.swMini .swKm{font-size:12px;font-weight:700;color:var(--muted);white-space:nowrap}
+.swMini .swChev{font-style:normal;font-size:12px;color:var(--muted)}
+.swKecil{border:0;background:var(--ground);border-radius:12px;padding:8px;font-size:12.5px;font-weight:700;color:var(--muted);min-height:36px}
+.sweepcard.swmin{padding:9px 14px!important;max-height:none!important;overflow:visible!important;gap:0}
 .sweepcard{position:absolute;left:14px;right:14px;top:84px;z-index:890;background:#fff;border-radius:22px;box-shadow:0 10px 30px rgba(20,24,35,.16);padding:14px 16px;display:none;flex-direction:column;gap:9px;max-height:calc(100% - 230px);overflow-y:auto}
 .zinfo{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;border-top:1px solid var(--line2);padding-top:10px}
 .zinfo div{display:flex;flex-direction:column;gap:1px}.zinfo span{font-size:12px;color:var(--muted);font-weight:600}.zinfo b{font-size:15px}
@@ -661,6 +667,7 @@ svg .seg{transform-box:view-box;transform-origin:0 0}
 
 <script src="lib/leaflet.js"></script>
 <script src="lib/leaflet-rotate.js"></script>
+<script>if(window.L&&L.Map){L.Map.mergeOptions({rotateControl:false});}</script>
 <script src="config.js"></script>
 <script src="skypet.js"></script>
 <script src="slselect.js"></script>

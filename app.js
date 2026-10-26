@@ -1173,6 +1173,8 @@ function pasangBasemapToggle(petaMap, hybridLayer){
 function buatHybrid(){ return L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {subdomains: ['mt0','mt1','mt2','mt3'], maxZoom: 20}); }
 /* ---- Peta ikut arah jalan (seperti Google Maps): peta berputar supaya arah gerak selalu menghadap ke atas ----
    Arah dihitung dari jarak tempuh >=9 m (bukan dari tiap titik GPS, supaya tidak muter-muter saat diam). Hanya aktif saat mengikuti posisi di dalam zona. */
+let sweepMin = (lsGet('sl2_sweepmin', true) !== false);
+function toggleSweep(){ sweepMin = !sweepMin; lsSet('sl2_sweepmin', sweepMin); const sw = $('sweepcard'); if(sw) sw.dataset.sig = ''; renderPosisi(); }
 let headUp = (lsGet('sl2_headup', true) !== false), headDeg = null, headAnchor = null, bearTween = null;
 function selisihDeg(a, b){ return ((b - a + 540) % 360) - 180; }
 function perbaruiArah(lat, lon, acc){
@@ -1191,17 +1193,17 @@ function setBearAnim(target){
   batalBearTween();
   const dari = map.getBearing(), selisih = selisihDeg(dari, target);
   if(Math.abs(selisih) < 1.5) return;
-  let i = 0; const N = 10;
+  let i = 0; const N = 6;
   bearTween = setInterval(() => {
     i++; if(!map || !map.setBearing){ batalBearTween(); return; }
     map.setBearing((dari + selisih * (i / N) + 360) % 360); setPanahDeg(); perbaruiKompas();
     if(i >= N) batalBearTween();
-  }, 45);
+  }, 70);
 }
 function terapkanArahPeta(){
   if(!map || !map.setBearing) return;
   const ikut = headUp && followMode && lastPos && zonaAktif && insideZone(lastPos.lat, lastPos.lon);
-  if(ikut){ if(headDeg != null) setBearAnim((360 - headDeg) % 360); }   // peta diputar berlawanan arah jarum jam sebesar arah gerak -> arah gerak menghadap atas
+  if(ikut){ if(headDeg != null){ const tgt = (360 - headDeg) % 360; if(Math.abs(selisihDeg(map.getBearing(), tgt)) >= 12) setBearAnim(tgt); } }   // ambang 12°: tidak menggambar ulang jalan tiap goyangan kecil   // peta diputar berlawanan arah jarum jam sebesar arah gerak -> arah gerak menghadap atas
   else if(Math.abs(selisihDeg(map.getBearing(), 0)) > 1.5) setBearAnim(0);
   perbaruiKompas();
 }
@@ -1220,8 +1222,10 @@ function arrowIcon(deg, besar){
 }
 /* lapisan petak (kotak/zona) selalu di bawah marker toko, supaya toko tetap bisa diketuk */
 function siapkanPane(m){
-  var a = m.createPane('petakPane'); a.style.zIndex = 380;
-  var b = m.createPane('tokoPane'); b.style.zIndex = 650;
+  /* peta yang bisa berputar: lapisan vektor HARUS ikut di dalam rotatePane (kalau tidak, kotak/jalan menghilang saat peta diputar) */
+  var ct = m._rotatePane || undefined;
+  var a = m.createPane('petakPane', ct); a.style.zIndex = 380;
+  var b = m.createPane('tokoPane', ct); b.style.zIndex = 650;
 }
 function petaSemuaTampil(){
   if(!$('tabPeta') || tabAktif !== 'peta') return;
@@ -1724,13 +1728,17 @@ function renderPosisi(paksa){
     if(petakLbl && petakLbl._map) map.removeLayer(petakLbl);
     const z = zonaAktif.z;
     const sisa = N - n, adaJl = !!(keyZ && typeof jlPetak === 'function' && jlPetak(keyZ));
-    const html = (N ? '<div class="row" style="justify-content:space-between"><span style="font-size:13px;font-weight:700;color:var(--navy)">Kamu di dalam zona</span>' + (sisa ? '<span style="font-size:13px;font-weight:800;color:var(--orange-ink)">Sisa ' + sisa + ' kotak</span>' : '<span style="font-size:13px;font-weight:800;color:var(--navy)">Semua kotak selesai ✓</span>') + '</div>' +
+    const rbMini = adaJl ? jlRingkasBesar([keyZ]) : null;
+    const mini = '<button type="button" class="swMini" onclick="toggleSweep()" aria-label="Buka detail zona"><b>' + (N ? n + '/' + N + ' kotak' : 'Tanpa permukiman') + '</b>' + (N ? segKotakHtml(n, N, 'flex:1;min-width:40px') : '<span style="flex:1"></span>') +
+      (rbMini && rbMini.tot > 0 ? '<span class="mono swKm">' + jlKm(rbMini.mkn) + '/' + jlKm(rbMini.tot) + ' km</span>' : '') + '<i class="swChev">▼</i></button>';
+    const html = sweepMin ? mini : (N ? '<div class="row" style="justify-content:space-between"><span style="font-size:13px;font-weight:700;color:var(--navy)">Kamu di dalam zona</span>' + (sisa ? '<span style="font-size:13px;font-weight:800;color:var(--orange-ink)">Sisa ' + sisa + ' kotak</span>' : '<span style="font-size:13px;font-weight:800;color:var(--navy)">Semua kotak selesai ✓</span>') + '</div>' +
       '<div style="display:flex;align-items:baseline;gap:6px"><b style="font-size:34px;line-height:1">' + n + '</b><span class="muted" style="font-size:15px;font-weight:600">/ ' + N + ' kotak' + (adaJl && N < 16 ? ' berpenghuni' : '') + '</span></div>' +
       segKotakHtml(n, N, 'flex:none') +
       '<div class="muted" style="font-size:12px">' + (adaJl ? 'Susuri jalan di tiap kotak sampai jadi teal. Kotak gelap = tanpa rumah, tidak dihitung.' : 'Jelajahi tiap kotak ±1 menit (jalan-jalan keliling kotaknya) supaya dianggap disisir. Rute terekam otomatis walau layar mati.') + '</div>'
       : '<div class="jlKosong"><b>Petak ini tidak ada permukiman</b><span>Tidak perlu disisir — tidak ada atap rumah di citra satelit. Lanjut ke zona lain ya!</span></div>') +
       (adaJl ? jlKartuHtml(keyZ, zInfoOpen) : '') +
-      (z ? '<button type="button" onclick="zInfoOpen=!zInfoOpen;renderPosisi()" style="border:0;background:var(--ground);border-radius:12px;padding:10px;font-size:13px;font-weight:700;min-height:42px">' + (adaJl ? 'Nama jalan & info zona ' : 'Info zona lengkap ') + (zInfoOpen ? '▲' : '▼') + '</button>' + (zInfoOpen ? infoZonaHtml(z) : '') : '');
+      (z ? '<button type="button" onclick="zInfoOpen=!zInfoOpen;renderPosisi()" style="border:0;background:var(--ground);border-radius:12px;padding:10px;font-size:13px;font-weight:700;min-height:42px">' + (adaJl ? 'Nama jalan & info zona ' : 'Info zona lengkap ') + (zInfoOpen ? '▲' : '▼') + '</button>' + (zInfoOpen ? infoZonaHtml(z) : '') : '') + (sweepMin ? '' : '<button type="button" class="swKecil" onclick="toggleSweep()">Kecilkan kartu ▲</button>');
+    sw.classList.toggle('swmin', !!sweepMin);
     if(sw.dataset.sig !== html){ sw.innerHTML = html; sw.dataset.sig = html; }
     const sh = '<i class="grab"></i><div class="bar-actions"><button class="btn or" style="flex:2" onclick="bukaWizard()">' + ico('plus', 'stroke-width:2.4') + 'Catat temuan</button><button class="btn gh" style="flex:1;white-space:nowrap" onclick="toggleSearchToko()">' + ico('search') + 'Cek toko</button></div>';
     if(zs.dataset.sig !== sh){ zs.innerHTML = sh; zs.dataset.sig = sh; }
