@@ -136,6 +136,23 @@ h1,h2,h3,p{margin:0}
 /* riwayat */
 .hist{display:flex;gap:12px;align-items:center;padding:12px}
 .hist .th{width:50px;height:50px;border-radius:14px;flex:none}
+.stat.pred b small{font-size:12px;font-weight:700;color:var(--muted)}
+.stat.pred em{display:block;font-style:normal;font-size:11.5px;color:var(--muted);margin-top:2px}
+.stat.pred em i{font-style:normal;color:#B84A00;font-weight:800}
+.pdIco{width:18px;height:18px;flex:none;fill:none;stroke:#FE7A1B;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+.pdKartu{display:flex;gap:12px;align-items:center;background:var(--navy);color:#fff;border-radius:16px;padding:12px 14px}
+.pdKartu b{font-size:16px;line-height:1.25}.pdKartu span span{font-size:12.5px;color:#C9D0DE;font-weight:600}
+.pdKartu .pdBesar{width:46px;height:46px;border-radius:14px;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;flex:none}
+.pdKartu .pdBesar .pdIco{width:28px;height:28px}
+button.hist{width:100%;text-align:left;font:inherit;color:inherit;border:0;cursor:pointer}
+button.hist:active{transform:scale(.99)}
+.fotoContoh{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.fotoContoh .fc{display:flex;gap:8px;align-items:center;padding:6px;border-radius:14px;background:#F4F6FA}
+.fotoContoh .fc img{width:46px;height:62px;object-fit:cover;border-radius:9px;flex:none}
+.fotoContoh .fc span{font-size:11.5px;line-height:1.3;color:#3B4660}
+.fotoContoh .fc b{display:block;font-size:12.5px;margin-bottom:1px}
+.fotoContoh .ok{box-shadow:inset 0 0 0 1.5px #16A34A}.fotoContoh .ok b{color:#15803D}
+.fotoContoh .no{box-shadow:inset 0 0 0 1.5px #DC2626}.fotoContoh .no b{color:#B91C1C}
 .tagc{align-self:flex-start;font-size:11px;font-weight:800;border-radius:999px;padding:3px 9px}
 .sync{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:10px;font-weight:700;width:58px;text-align:center}
 
@@ -358,6 +375,9 @@ svg .seg{transform-box:view-box;transform-origin:0 0}
 .zonecard.jksHari::after{content:"";position:absolute;top:-20%;bottom:-20%;left:-40%;width:28%;background:linear-gradient(100deg,rgba(255,255,255,0) 0%,rgba(255,255,255,.75) 50%,rgba(255,255,255,0) 100%);transform:skewX(-18deg);animation:kilatJks 4.2s ease-in-out infinite;pointer-events:none}
 .zonecard.jksHari>*{position:relative;z-index:1}
 .zonecard.jksHari .zNo{background:#FE7A1B;color:#fff}
+.zonecard.jksHari{padding-top:0}
+.jksPita{display:flex;align-items:center;justify-content:space-between;margin:0 -14px 2px;padding:7px 14px;background:linear-gradient(180deg,#C8102E,#A50D25);color:#fff;font-size:12.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;border-radius:inherit;border-bottom-left-radius:0;border-bottom-right-radius:0}
+.jksPita em{font-style:normal;font-size:11.5px;letter-spacing:0;text-transform:none;background:rgba(255,255,255,.2);padding:1px 8px;border-radius:999px}
 @keyframes kilatJks{0%,55%{left:-40%}100%{left:130%}}
 @media (prefers-reduced-motion:reduce){.zonecard.jksHari::after{animation:none;display:none}}
 .lbMati .lbPetak{display:none}
@@ -681,6 +701,7 @@ svg .seg{transform-box:view-box;transform-origin:0 0}
 <script src="slselect.js"></script>
 <script src="app.js"></script>
 <script src="jalan.js"></script>
+<script src="pandu.js"></script>
 <script src="pinpin.js"></script>
 <script>SLSelect.init({sheet: true}); startApp();</script>
 </body>

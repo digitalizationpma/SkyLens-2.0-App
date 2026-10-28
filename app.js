@@ -6,7 +6,7 @@
    ============================================================ */
 const SUPABASE_URL = 'https://bgvdrinvblanlaykydit.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_EMHLQqIuGbFaCBUYkV5yVw_X_yR_aKZ';
-const APP_VERSI = '1.2.1';
+const APP_VERSI = '1.2.2';
 const S = 0.01;       // ukuran petak (derajat)
 const GRID_N = 4;     // 4x4 = 16 kotak per petak
 const NAMA_PRIO = ['-', 'A', 'B', 'C'];
@@ -969,8 +969,9 @@ function zonaCardHtml(z, idx, no){
   if(lastPos){ const d = jarakKeTepiZona(z, lastPos.lat, lastPos.lon); here = d < 1; jarak = here ? 'kamu di sini' : fmtJarak(d); }
   const N = nKotak(key), jk = (JKS_PETAK || {})[key] || 0;
   return '<button type="button" class="card zonecard' + (here ? ' here' : '') + (jk ? ' jksHari' : '') + '" onclick="bukaZonaIdx(' + idx + ')">' +
+    (jk ? '<span class="jksPita">Searah JKS hari ini<em>' + jk + ' toko</em></span>' : '') +
     '<span class="row" style="justify-content:space-between;align-items:flex-start;width:100%;gap:10px"><span class="zNo">' + no + '</span><span class="col" style="gap:2px;flex:1;min-width:0"><b style="font-size:16px">' + esc(z[11] || ('Petak ' + key)) + '</b>' +
-    '<span class="muted" style="font-size:13px">' + esc(kecZona(z)) + (jarak ? ' · ' + jarak : '') + '</span>' + (jk ? '<span class="jksChip">JKS hari ini · ' + jk + ' toko</span>' : '') + '</span><span class="prio p' + (pr === '-' ? 'X' : pr) + '">Prioritas ' + pr + '</span></span>' +
+    '<span class="muted" style="font-size:13px">' + esc(kecZona(z)) + (jarak ? ' · ' + jarak : '') + '</span></span><span class="prio p' + (pr === '-' ? 'X' : pr) + '">Prioritas ' + pr + '</span></span>' +
     '<span class="row" style="width:100%;gap:10px">' + segKotakHtml(n, N) + '<span class="mono" style="font-size:13px;white-space:nowrap">' + teksKotak(n, N) + '</span></span></button>';
 }
 /* ---- bilah RBM/BM/ASS: pilih depo + filter sales ---- */
@@ -1027,7 +1028,6 @@ function renderBeranda(){
   else if(zonaState.mode === 'kosong') h += '<div class="empty">Belum ada zona yang ditugaskan ke kamu. Hubungi BM/koordinator.</div>';
   else {
     if(zonaState.offline) h += '<div class="banner warn"><span>Tidak ada sinyal — menampilkan daftar terakhir yang tersimpan.</span></div>';
-    h += jksInfoHtml();
     const idx = tampilIdx.slice();
     const jkn = i => JKS_PETAK[keyDari(zonaList[i][2], zonaList[i][3])] || 0;
     if(lastPos) idx.sort((a, b) => jarakKeTepiZona(zonaList[a], lastPos.lat, lastPos.lon) - jarakKeTepiZona(zonaList[b], lastPos.lat, lastPos.lon));
@@ -1058,19 +1058,80 @@ function renderRiwayat(){
   const nz = k => { if(k == null) return 'Luar petak'; const z = zonaDariKey(Number(k)); return z[11] || ('Petak ' + k); };
   let h = '<div class="row" style="justify-content:space-between"><h1 style="font-size:24px;font-weight:800">Riwayat temuan</h1><span class="muted" style="font-size:12px;font-weight:700">' + esc(namaDepan(sesi.nama)) + '</span></div>';
   h += '<div style="display:grid;grid-template-columns:1.3fr 1fr;gap:10px">' +
-    '<div class="hero" style="padding:16px;gap:4px"><span style="font-size:13px;font-weight:700">Lanjut NOO</span><b style="font-size:36px;line-height:1">' + rk.bulan_ini.noo + '</b><span style="font-size:12px">bulan ini · total ' + rk.total_noo + '</span></div>' +
+    '<div class="hero" style="padding:16px;gap:4px"><span style="font-size:13px;font-weight:700">NOO sah (foto + GPS)</span><b style="font-size:36px;line-height:1">' + rk.bulan_ini.noo + '</b><span style="font-size:12px">bulan ini · total ' + rk.total_noo + '</span></div>' +
     '<div class="card" style="padding:16px;display:flex;flex-direction:column;gap:4px;border-radius:20px"><span class="muted" style="font-size:13px;font-weight:700">Temuan</span><b style="font-size:36px;line-height:1">' + rk.bulan_ini.temuan + '</b><span class="muted" style="font-size:12px">' + rk.menunggu + ' menunggu sinyal</span></div></div>';
   if(!list.length) h += '<div class="empty">Belum ada temuan. Ketuk tombol + oranye untuk mencatat toko pertamamu.</div>';
   h += list.map(t => {
     const s = STY[t.st] || STY.sudah_dicover;
     const kirim = t.kirim;
-    return '<div class="card hist"><div class="th" style="background:linear-gradient(160deg,' + s[3] + ',' + s[4] + ')"></div>' +
+    return '<button type="button" class="card hist" onclick="bukaDetailTemuan(\'' + esc(String(t.id)) + '\')"><div class="th" style="background:linear-gradient(160deg,' + s[3] + ',' + s[4] + ')"></div>' +
       '<div class="col" style="flex:1;min-width:0;gap:3px"><b style="font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(t.nama || (t.st === 'sudah_dicover' ? 'Toko sudah dicover' : 'Toko tanpa nama')) + '</b>' +
       '<span class="muted" style="font-size:12px">' + esc(nz(t.key)) + ' · ' + labelWaktu(t.t) + (t.uk ? ' · ' + t.uk : '') + '</span>' +
       '<span class="tagc" style="background:' + s[1] + ';color:' + s[2] + '">' + s[0] + '</span></div>' +
-      '<span class="sync" style="color:' + (kirim ? '#1F2C4F' : '#B9480A') + '">' + (kirim ? ico('cloud', 'width:18px;height:18px') : ico('clock', 'width:18px;height:18px')) + (kirim ? 'Terkirim' : 'Menunggu sinyal') + '</span></div>';
+      '<span class="sync" style="color:' + (kirim ? '#1F2C4F' : '#B9480A') + '">' + (kirim ? ico('cloud', 'width:18px;height:18px') : ico('clock', 'width:18px;height:18px')) + (kirim ? 'Terkirim' : 'Menunggu sinyal') + '</span></button>';
   }).join('');
   if(el.dataset.sig !== h){ const st = el.parentElement.scrollTop; el.innerHTML = h; el.dataset.sig = h; el.parentElement.scrollTop = st; }
+}
+
+/* ---------- DETAIL TEMUAN (ketuk kartu riwayat) — isi sama dengan ringkasan terakhir form ---------- */
+const HASIL_LBL = {lanjut_noo: 'Lanjut NOO', nanti_dikunjungi: 'Nanti dikunjungi lagi', tidak_tertarik: 'Tidak tertarik', sudah_dicover: 'Sudah dicover sales Nabati'};
+const SUB_LBL = {'1_minggu': 'seminggu lagi', '2_minggu': '2 minggu lagi', grosir_saja: 'beli di grosir saja', order_kecil: 'order <100rb'};
+let RD = null;
+function rdLepasFoto(){ if(RD && RD.blobUrl){ try{ URL.revokeObjectURL(RD.blobUrl); }catch(e){} } }
+async function bukaDetailTemuan(id){
+  if(!sesi) return;
+  const t = temuanGabungan().find(x => String(x.id) === String(id)); if(!t) return;
+  rdLepasFoto();
+  RD = {id: String(id), t: t, p: null, fotoUrl: null, blobUrl: null, muat: true};
+  const ob = obTemuan.find(r => r.payload && String(r.payload.id) === String(id));
+  if(ob){ RD.p = ob.payload; if(ob.foto){ try{ RD.blobUrl = RD.fotoUrl = URL.createObjectURL(ob.foto); }catch(e){} } RD.muat = false; }
+  tampil('scrTemuan'); renderDetailTemuan();
+  if(!ob){
+    try{
+      const r = await fetchTO(SUPABASE_URL + '/rest/v1/temuan_pilot?id=eq.' + encodeURIComponent(String(id)) + '&select=*', {headers: hdr()}, 9000);
+      if(r.ok){ const j = await r.json(); if(RD && RD.id === String(id) && j && j[0]){ RD.p = j[0]; RD.fotoUrl = j[0].foto_url || null; } }
+    }catch(e){}
+    if(RD && RD.id === String(id)){ RD.muat = false; if(screenAktif === 'scrTemuan' && !W) renderDetailTemuan(); }
+  }
+}
+function tutupDetailTemuan(){ rdLepasFoto(); RD = null; tampil('scrMain'); bukaTab('riwayat'); }
+function renderDetailTemuan(){
+  if(!RD) return;
+  const t = RD.t, d = t.d || {}, p = RD.p || {};
+  const v = (a, b) => (a != null && a !== '') ? a : ((b != null && b !== '') ? b : null);
+  const st = v(p.status_tindak_lanjut, t.st) || '';
+  const nama = v(p.nama_toko, t.nama) || (st === 'sudah_dicover' ? 'Toko sudah dicover' : 'Toko tanpa nama');
+  const key = p.key_petak != null ? Number(p.key_petak) : t.key;
+  const lokasi = key == null ? 'Di luar petak penugasan' : ((zonaDariKey(Number(key)) || [])[11] || ('Petak ' + key));
+  const lat = v(p.lat, d.lat), lon = v(p.lon, d.lon), acc = v(p.akurasi, d.acc);
+  const sub = v(p.jadwal_kunjung_lagi, d.jd) || v(p.alasan_tidak_tertarik, d.al);
+  const bl = v(p.rata_belanja_nabati, d.bl);
+  const adaFoto = !!RD.fotoUrl || (!!p.foto_url);
+  const waktu = new Date(Date.parse(p.tanggal) || t.t);
+  const row = (k, val) => val == null || val === '' ? '' : '<div class="sumrow"><span>' + k + '</span><b>' + val + '</b></div>';
+  let banner = '';
+  if(st === 'lanjut_noo'){
+    const okGps = lat != null && lon != null;
+    banner = (okGps && (adaFoto || RD.muat))
+      ? '<div class="banner ok" style="justify-content:flex-start">' + ico('check', 'width:18px;height:18px') + '<span>NOO sah: ada foto dan lokasi GPS.</span></div>'
+      : '<div class="banner warn" style="justify-content:flex-start">' + ico('info', 'width:18px;height:18px') + '<span>Belum dihitung NOO sah: ' + (!okGps ? 'lokasi GPS tidak tercatat saat disimpan' : 'foto belum ada') + '.</span></div>';
+  }
+  const foto = RD.fotoUrl ? '<div class="photo has"><img src="' + esc(RD.fotoUrl) + '" alt="Foto toko"></div>'
+    : (RD.muat ? '<div class="photo" style="pointer-events:none"><span class="muted" style="font-size:13px">Memuat foto…</span></div>' : (st === 'sudah_dicover' ? '' : '<div class="photo" style="pointer-events:none"><span class="muted" style="font-size:13px">Foto tidak tersedia di HP ini' + (t.kirim ? '' : ' (menunggu terkirim)') + '</span></div>'));
+  const h = '<div class="wizhead"><div class="row"><button type="button" class="ibtn" onclick="tutupDetailTemuan()" aria-label="Kembali">' + ico('back') + '</button>' +
+    '<div class="col" style="flex:1;min-width:0;gap:2px"><b style="font-size:17px">Detail temuan</b><span class="muted" style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(nama) + '</span></div></div></div>' +
+    '<div class="scrollY" style="padding:14px 20px;display:flex;flex-direction:column;gap:12px">' + foto +
+    '<div class="card" style="padding:4px 16px">' +
+    row('Lokasi', esc(lokasi)) + row('Waktu', esc(waktu.toLocaleDateString('id-ID', {day: 'numeric', month: 'short', year: 'numeric'}) + ' · ' + waktu.toLocaleTimeString('id-ID', {hour: '2-digit', minute: '2-digit'}))) +
+    (st === 'sudah_dicover' ? '' : row('Nama toko', esc(nama)) + row('Ukuran', esc(v(p.ukuran_toko, t.uk) || '')) +
+      row('Belanja ke', esc([v(p.belanja_kemana, d.ke), v(p.nama_grosir_pasar, d.gr)].filter(Boolean).join(' · '))) +
+      row('Belanja Nabati', bl == null ? null : fmtRp(+bl) + ' / bln') + row('No HP', esc(v(p.no_hp, d.hp) || ''))) +
+    row('Hasil', esc((HASIL_LBL[st] || st || '-') + (SUB_LBL[sub] ? ' · ' + SUB_LBL[sub] : ''))) +
+    row('Catatan', esc(v(p.catatan, d.cat) || '')) +
+    row('GPS', lat != null ? (Number(lat).toFixed(5) + ', ' + Number(lon).toFixed(5) + (acc != null ? ' (±' + Math.round(acc) + ' m)' : '')) : 'tidak tercatat') +
+    row('Status', t.kirim ? 'Terkirim ke server' : 'Menunggu sinyal') + '</div>' + banner + '</div>' +
+    '<div class="wizfoot"><button type="button" class="btn gh" style="flex:1" onclick="tutupDetailTemuan()">Kembali ke riwayat</button></div>';
+  const body = $('wizBody'); body.innerHTML = h; body.dataset.step = 'rd';
 }
 
 /* ---------- PEMBARUAN TAMPILAN (UiBundle di Android) ---------- */
@@ -1282,7 +1343,7 @@ function petaSemuaPerbarui(fit){
     const bounds = [];
     zonaList.forEach((z, i) => {
       if(!zonaTampil(z) && i !== allSel) return;   // hanya petak kerja sales ini (A/B + JKS hari ini; C kalau dinyalakan)
-      const key = keyDari(z[2], z[3]), b = batasZona(z), sel = i === allSel, n = progresZona(key), w = WARNA_PRIO[z[23]] || '#9aa3b2', jk = (JKS_PETAK || {})[key] || 0;
+      const key = keyDari(z[2], z[3]), b = batasZona(z), sel = i === allSel, n = progresZona(key), w = (nKotak(key) > 0 && n >= nKotak(key)) ? '#2563EB' : (WARNA_PRIO[z[23]] || '#9aa3b2'), jk = (JKS_PETAK || {})[key] || 0;
       /* warna petak = warna dashboard: A merah, B oranye, C kuning */
       const r = L.rectangle([[b.lat0, b.lon0], [b.lat1, b.lon1]], {color: sel ? '#1C212D' : w, weight: sel ? 4 : (jk ? 3.5 : 2.5), fillColor: w, fillOpacity: sel ? 0.34 : 0.24, pane: 'petakPane'}).addTo(mapAll);
       r.on('click', () => { allSel = i; petaSemuaPerbarui(); petaSemuaSheet(); });
@@ -1516,6 +1577,16 @@ function buatKotak(){
 function tandaiKotakDariGrid(){
   cells.forEach(x => { if(x.aktif !== false && gridSet.has(zonaAktif.key_petak + ':' + x.r + ':' + x.c)) x.visited = true; });
 }
+/* prediksi toko per petak (sama dengan dashboard & misi Pinpin): prediksi = potensi model dibulatkan ke atas; peluang = prediksi - yang sudah ada */
+function prediksiPetak(z){
+  const pL = Math.ceil((z[16] || 0) - 1e-9), pM = Math.ceil((z[18] || 0) - 1e-9), aL = z[15] || 0, aM = z[17] || 0;
+  return {pL: pL, aL: aL, tL: Math.max(0, pL - aL), pM: pM, aM: aM, tM: Math.max(0, pM - aM)};
+}
+function kartuPrediksiHtml(z){
+  const q = prediksiPetak(z);
+  const k = (lbl, p, a, t) => '<div class="stat cp pred"><span>' + lbl + '</span><b>' + p + ' <small>toko</small></b><em>ada ' + a + ' · ' + (t > 0 ? '<i>peluang +' + t + '</i>' : 'sudah penuh') + '</em></div>';
+  return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' + k('Prediksi RT-L', q.pL, q.aL, q.tL) + k('Prediksi RT-M/RT-S', q.pM, q.aM, q.tM) + '</div>';
+}
 function infoZonaHtml(z){
   const pr = NAMA_PRIO[z[23]] || '-';
   const f1 = v => String(Math.ceil(Number(v || 0) - 1e-9));   // potensi dibulatkan ke atas (1,9 -> 2)
@@ -1524,6 +1595,7 @@ function infoZonaHtml(z){
     '<div><span>RT-L (ada · potensi)</span><b>' + (z[15] || 0) + ' · ' + f1(z[16]) + '</b></div><div><span>RT-S/M (ada · potensi)</span><b>' + (z[17] || 0) + ' · ' + f1(z[18]) + '</b></div></div>';
 }
 function bukaZona(z){
+  if(typeof pdBerhenti === 'function') pdBerhenti(true);
   const key = keyDari(z[2], z[3]);
   zonaAktif = {key_petak: key, kecamatan: namaZona(z), kabupaten: z[13] || sesi.depot, gx: z[2], gy: z[3], manual: false, z: z};
   siapkanLayarPeta();
@@ -1569,6 +1641,7 @@ function bukaAreaManual(a){
 function hashKeyAreaManual(id){ let h = 0; const s = String(id); for(let i = 0; i < s.length; i++){ h = (h*31 + s.charCodeAt(i)) >>> 0; } return 9200000000000 + (h % 900000000); }
 
 function kembaliKeDaftar(){
+  if(typeof pdBerhenti === 'function') pdBerhenti(true);
   tutupSearchToko();
   if(map){ map.remove(); map = null; trailLayer = null; trailRunLine = null; cellLayer = null; }
   zonaAktif = null; cellLastT = null; cells = []; youMarker = null;
@@ -1657,6 +1730,7 @@ function pollFix(){
   renderPosisi();
   if(screenAktif === 'scrMain' && tabAktif === 'peta') petaSemuaPerbarui();
 }
+window.lastPosGlobal = () => lastPos;
 function prosesFix(lat, lon, acc, t, replay){
   if(lastPos && lastPos.t > t) return;
   lastPos = {lat: lat, lon: lon, acc: acc, t: t, brg: lastPos ? bearing(lastPos.lat, lastPos.lon, lat, lon) : 0};
@@ -1665,6 +1739,7 @@ function prosesFix(lat, lon, acc, t, replay){
   if(!replay) cekPopupProspek(lat, lon, t, acc);
   prosesSisir(lat, lon, t);
   if(typeof jlProsesFix === 'function') jlProsesFix(lat, lon, acc, t, replay);
+  if(!replay && typeof PD !== 'undefined' && PD.aktif) pdPerbarui();
 }
 function warnaSegmen(a, b){ return (b.t - a.t) > GAP_HITAM_MS ? '#1a1a1a' : '#00BFA5'; }
 function gambarSegmenJejak(a, b){
@@ -1733,11 +1808,12 @@ function tapKartuNav(){
 function renderPosisi(paksa){
   if(!map || !zonaAktif) return;
   const sw = $('sweepcard'), nv = $('navcard'), zs = $('zoneSheet');
+  const lastPos = (typeof PD !== 'undefined' && PD.aktif) ? (pdPos() || window.lastPosGlobal()) : window.lastPosGlobal();
   if(lastPos){
     const lat = lastPos.lat, lon = lastPos.lon;
     if(!youMarker){ youMarker = L.marker([lat, lon], {icon: arrowIcon(degPanah())}).addTo(map); }
     else { youMarker.setLatLng([lat, lon]); youMarker.setIcon(arrowIcon(degPanah())); }
-    if(followMode && insideZone(lat, lon)) map.panTo([lat, lon], {animate: true});
+    if(followMode && (insideZone(lat, lon) || (typeof PD !== 'undefined' && PD.aktif))) map.panTo([lat, lon], {animate: true});
     terapkanArahPeta();
   }
   if($('searchTokoPanel').style.display === 'block') return;
@@ -1782,7 +1858,9 @@ function renderPosisi(paksa){
   } else {
     sw.style.display = 'none'; nv.style.display = 'flex';
     const z = zonaAktif.z;
-    if(lastPos){
+    const pdSub = (typeof PD !== 'undefined' && PD.aktif) ? pdNavSub() : null;
+    if(pdSub) setSubNav(pdSub);
+    else if(lastPos){
       const b = {lat0: LAT0, lat1: LAT1, lon0: LON0, lon1: LON1};
       const p = titikTerdekat(b, lastPos.lat, lastPos.lon);
       const d = haversine(lastPos.lat, lastPos.lon, p.lat, p.lon);
@@ -1795,10 +1873,17 @@ function renderPosisi(paksa){
     const stat = z
       ? '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px"><div class="stat cp"><span>Bangunan</span><b>' + (z[4] || 0).toLocaleString('id-ID') + '</b></div><div class="stat cp"><span>Toko terdaftar</span><b>' + (z[6] || 0) + '</b></div><div class="stat cp"><span>Disisir</span><b>' + teksKotak(n, N) + '</b></div></div>'
       : '<div class="stat cp"><span>Disisir</span><b>' + teksKotak(n, N) + '</b></div>';
-    const sh = '<i class="grab"></i>' + stat +
-      '<div class="banner warn cp" style="justify-content:flex-start">' + ico('info', 'width:16px;height:16px;color:var(--orange-ink)') + '<span>Kotak sisir muncul saat masuk zona</span></div>' +
-      '<button class="btn or" onclick="navigasiAktif()">' + ico('nav') + 'Arahkan dengan Google Maps</button>' +
-      '<button class="btn gh sm" onclick="bukaWizard()">' + ico('plus') + 'Catat temuan di sini</button>';
+    const bisaPandu = typeof pdTersedia === 'function' && pdTersedia() && !zonaAktif.manual;
+    const sh = (typeof PD !== 'undefined' && PD.aktif)
+      ? '<i class="grab"></i>' + pdKartuHtml() +
+        '<div class="bar-actions"><button class="btn gh" style="flex:1" onclick="pdBerhenti()">Berhenti pandu</button><button class="btn gh" style="flex:1;white-space:nowrap" onclick="navigasiAktif()">' + ico('nav') + 'Google Maps</button></div>' +
+        '<button class="btn gh sm" onclick="bukaWizard()">' + ico('plus') + 'Catat temuan di sini</button>'
+      : '<i class="grab"></i>' + stat + (z ? kartuPrediksiHtml(z) : '') +
+        '<div class="banner warn cp" style="justify-content:flex-start">' + ico('info', 'width:16px;height:16px;color:var(--orange-ink)') + '<span>Kotak sisir muncul saat masuk zona</span></div>' +
+        (bisaPandu ? '<button class="btn or" onclick="pdMulai()">' + ico('nav') + 'Pandu ke petak</button>' +
+          '<div class="bar-actions"><button class="btn gh sm" style="flex:1;white-space:nowrap" onclick="navigasiAktif()">Buka Google Maps</button><button class="btn gh sm" style="flex:1;white-space:nowrap" onclick="bukaWizard()">' + ico('plus') + 'Catat temuan</button></div>'
+        : '<button class="btn or" onclick="navigasiAktif()">' + ico('nav') + 'Arahkan dengan Google Maps</button>' +
+          '<button class="btn gh sm" onclick="bukaWizard()">' + ico('plus') + 'Catat temuan di sini</button>');
     if(zs.dataset.sig !== sh){ zs.innerHTML = sh; zs.dataset.sig = sh; }
   }
 }
@@ -1833,7 +1918,36 @@ function jawabProspekTidak(){ $('popupProspek').style.display = 'none'; }
    ============================================================ */
 let W = null;
 function wizBaru(){ return {step: 1, sudah: null, nama: '', ukuran: '', ke: '', grosir: '', belanja: '', hp: '', foto: null, fotoUrl: null, status: '', sub: '', catatan: '', err: {}, simpan: false}; }
+/* ---- posisi untuk temuan: fix perekaman (≤3 mnt) atau GPS sekali-ambil (APK 1.2.2+, jalan walau perekaman mati) ---- */
+const POS_TEMUAN_MAKS_MS = 180000;
+let gpsSekali = null, gpsSekaliJalan = false;
+function posTemuan(){
+  const now = Date.now();
+  const a = lastPos && (now - lastPos.t) <= POS_TEMUAN_MAKS_MS ? lastPos : null;
+  const b = gpsSekali && (now - gpsSekali.t) <= POS_TEMUAN_MAKS_MS ? gpsSekali : null;
+  if(a && b) return (b.t > a.t + 30000 || (b.acc || 99) < (a.acc || 99) - 10) ? b : a;
+  return a || b || null;
+}
+function ambilGpsSekali(cb){
+  if(gpsSekaliJalan || !navigator.geolocation) return;
+  gpsSekaliJalan = true;
+  try{
+    navigator.geolocation.getCurrentPosition(p => {
+      gpsSekaliJalan = false;
+      gpsSekali = {lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy || 50, t: Date.now()};
+      if(cb) cb();
+    }, () => { gpsSekaliJalan = false; }, {enableHighAccuracy: true, timeout: 20000, maximumAge: 30000});
+  }catch(e){ gpsSekaliJalan = false; }
+}
+/* dipanggil saat form temuan dibuka & tiap langkah: kalau fix perekaman tidak segar, ambil GPS sekali */
+function siapkanGpsTemuan(){
+  const now = Date.now();
+  if(lastPos && (now - lastPos.t) <= 60000) return;
+  if(gpsSekali && (now - gpsSekali.t) <= 60000) return;
+  ambilGpsSekali(() => { if(W && screenAktif === 'scrTemuan') renderWiz(); });
+}
 function petakUntukTemuan(){
+  const lastPos = posTemuan();
   if(zonaAktif && lastPos && screenAktif === 'scrPeta' && insideZone(lastPos.lat, lastPos.lon)){
     return {key: zonaAktif.key_petak, luar: false, label: zonaAktif.manual ? zonaAktif.kecamatan : (zonaAktif.z && zonaAktif.z[11]) || ('Petak ' + zonaAktif.key_petak)};
   }
@@ -1847,9 +1961,10 @@ function petakUntukTemuan(){
 function bukaWizard(){
   if(!sesi) return;
   if(W && W.fotoUrl) URL.revokeObjectURL(W.fotoUrl);
+  rdLepasFoto(); RD = null;
   W = wizBaru(); wizAktifDariLayar = screenAktif;
   $('popupProspek').style.display = 'none';
-  tampil('scrTemuan'); renderWiz();
+  tampil('scrTemuan'); renderWiz(); siapkanGpsTemuan();
 }
 function tutupWizard(){
   if(W && W.fotoUrl) URL.revokeObjectURL(W.fotoUrl);
@@ -1858,6 +1973,7 @@ function tutupWizard(){
   tampil(balik); if(balik === 'scrMain') bukaTab(tabAktif || 'beranda'); else renderPosisi(true);
 }
 function gpsChipHtml(){
+  const lastPos = posTemuan();
   if(!lastPos) return '<span class="prio pC">GPS: menunggu sinyal…</span>';
   const a = lastPos.acc != null ? Math.round(lastPos.acc) : null;
   return '<span class="prio' + (a != null && a > 30 ? '' : ' pC') + '">GPS ±' + (a == null ? '?' : a) + ' m</span>';
@@ -1932,7 +2048,7 @@ function renderWiz(){
       '<div class="sumrow"><span>Belanja Nabati</span><b>' + fmtRp(+W.belanja) + ' / bln</b></div>' + (W.hp ? '<div class="sumrow"><span>No HP</span><b>' + esc(W.hp) + '</b></div>' : '') +
       '<div class="sumrow"><span>Hasil</span><b>' + (HASIL[W.status] || '-') + (SUB[W.sub] ? ' · ' + SUB[W.sub] : '') + '</b></div>' +
       (W.catatan ? '<div class="sumrow"><span>Catatan</span><b>' + esc(W.catatan) + '</b></div>' : '') + '</div>' +
-      (noo ? (lastPos ? '<div class="banner ok" style="justify-content:flex-start">' + ico('check', 'width:18px;height:18px') + '<span>NOO sah: ada foto dan lokasi GPS' + (pt.luar ? ' (di luar petak tetap dihitung)' : '') + '.</span></div>' : '<div class="banner warn" style="justify-content:flex-start">' + ico('info', 'width:18px;height:18px') + '<span>Lokasi GPS belum didapat. NOO baru dihitung kalau ada foto <b>dan</b> GPS — tunggu sebentar sebelum menyimpan.</span></div>') : '') +
+      (noo ? (posTemuan() ? '<div class="banner ok" style="justify-content:flex-start">' + ico('check', 'width:18px;height:18px') + '<span>NOO sah: ada foto dan lokasi GPS' + (pt.luar ? ' (di luar petak tetap dihitung)' : '') + '.</span></div>' : '<div class="banner warn" style="justify-content:flex-start">' + ico('info', 'width:18px;height:18px') + '<span>Lokasi GPS belum didapat. NOO baru dihitung kalau ada foto <b>dan</b> GPS — tunggu sebentar sebelum menyimpan.</span></div>') : '') +
       (pt.luar ? '<div class="banner ok" style="justify-content:flex-start">' + ico('pin', 'width:18px;height:18px') + '<span>Titik ini di luar petak penugasanmu — tetap tersimpan dengan koordinat GPS.</span></div>' : '') + '</div>' +
       wizFoot(W.simpan ? 'Menyimpan…' : 'Simpan temuan', 'wizSimpan()', W.simpan);
   }
@@ -1955,6 +2071,7 @@ function wizStatus(btn, val){
 }
 function wizNext(){
   const E = {};
+  siapkanGpsTemuan();
   if(W.step === 1){ if(!W.sudah) return; W.step = 2; renderWiz(); return; }
   if(W.step === 2){
     if(!W.nama.trim()) E.nama = true;
@@ -1985,7 +2102,9 @@ function renderWizFoto(){
   const bad = W.err && W.err.foto;
   box.innerHTML = W.foto
     ? '<div class="photo has"><img src="' + W.fotoUrl + '" alt="Foto toko"><button type="button" class="retake" onclick="ambilFoto()">' + ico('cam', 'width:16px;height:16px') + 'Ambil ulang</button></div>'
-    : '<button type="button" class="photo' + (bad ? ' bad' : '') + '" onclick="ambilFoto()">' + ico('cam', 'width:34px;height:34px') + '<b>Ambil foto toko <span class="req">wajib</span></b><span style="font-size:12px;color:' + (bad ? '#9A3412' : 'var(--muted)') + '">' + (bad ? 'Foto toko wajib dilampirkan' : 'Lokasi & waktu ditempel otomatis') + '</span></button>';
+    : '<div class="fotoContoh"><div class="fc ok"><img src="img/contoh_foto_bagus.jpg" alt="Contoh foto bagus"><span><b>✓ Bagus</b>Tampak depan toko utuh, etalase & papan kelihatan</span></div>' +
+      '<div class="fc no"><img src="img/contoh_foto_jelek.jpg" alt="Contoh foto kurang"><span><b>✗ Kurang</b>Terlalu dekat, cuma rak/produk</span></div></div>' +
+      '<button type="button" class="photo' + (bad ? ' bad' : '') + '" onclick="ambilFoto()">' + ico('cam', 'width:34px;height:34px') + '<b>Ambil foto toko <span class="req">wajib</span></b><span style="font-size:12px;color:' + (bad ? '#9A3412' : 'var(--muted)') + '">' + (bad ? 'Foto toko wajib dilampirkan' : 'Lokasi & waktu ditempel otomatis') + '</span></button>';
 }
 function ambilFoto(){ $('fotoInput').click(); }
 /* ---------- Viewer katalog: cubit zoom, geser, ketuk 2x (Pointer Events, tanpa library) ---------- */
@@ -2087,6 +2206,7 @@ function bukaKatalog(){
 function tutupKatalog(){ katStop(); KAT.ptr.clear(); $('modalKatalog').style.display = 'none'; }
 
 function dasarTemuan(pt){
+  const lastPos = posTemuan();
   return {id: uuid(), key_petak: pt.key,
     lat: lastPos ? lastPos.lat : null, lon: lastPos ? lastPos.lon : null,
     akurasi: lastPos && lastPos.acc != null ? Math.round(lastPos.acc) : null,
@@ -2097,7 +2217,7 @@ async function wizCepat(){
   const p = dasarTemuan(pt); p.status_tindak_lanjut = 'sudah_dicover';
   try{
     await obPut({id: 't_' + p.id, tipe: 'temuan', kode: sesi.kode, t: Date.now(), tries: 0, payload: p, foto: null});
-    tlUpsert({id: p.id, nama: '', st: 'sudah_dicover', t: Date.now(), key: pt.key, uk: null, luar: pt.luar, kirim: false});
+    tlUpsert({id: p.id, nama: '', st: 'sudah_dicover', t: Date.now(), key: pt.key, uk: null, luar: pt.luar, kirim: false, d: {lat: p.lat, lon: p.lon, acc: p.akurasi, lbl: pt.label, foto: false}});
     await hitungOutbox(); toast('Tercatat: toko sudah dicover sales Nabati'); prosesOutbox();
   }catch(e){ toast('Gagal menyimpan: ' + e.message, 4000); return; }
   tutupWizard();
@@ -2105,7 +2225,7 @@ async function wizCepat(){
 async function wizSimpan(){
   if(!W || W.simpan) return;
   const pt = petakUntukTemuan();
-  if(W.status === 'lanjut_noo' && !lastPos){
+  if(W.status === 'lanjut_noo' && !posTemuan()){
     if(!confirm('Lokasi GPS belum didapat. Temuan ini TIDAK dihitung sebagai NOO sah (NOO butuh foto dan GPS). Tetap simpan?')) return;
   }
   W.simpan = true; renderWiz();
@@ -2116,9 +2236,10 @@ async function wizSimpan(){
       jadwal_kunjung_lagi: W.status === 'nanti_dikunjungi' ? W.sub : null,
       alasan_tidak_tertarik: W.status === 'tidak_tertarik' ? W.sub : null, catatan: W.catatan.trim() || null});
     await obPut({id: 't_' + p.id, tipe: 'temuan', kode: sesi.kode, t: Date.now(), tries: 0, payload: p, foto: W.foto});
-    tlUpsert({id: p.id, nama: p.nama_toko, st: W.status, t: Date.now(), key: pt.key, uk: W.ukuran, luar: pt.luar, kirim: false});
+    tlUpsert({id: p.id, nama: p.nama_toko, st: W.status, t: Date.now(), key: pt.key, uk: W.ukuran, luar: pt.luar, kirim: false,
+      d: {ke: p.belanja_kemana, gr: p.nama_grosir_pasar, bl: p.rata_belanja_nabati, hp: p.no_hp, jd: p.jadwal_kunjung_lagi, al: p.alasan_tidak_tertarik, cat: p.catatan, lat: p.lat, lon: p.lon, acc: p.akurasi, lbl: pt.label, foto: true}});
     await hitungOutbox();
-    const noo = W.status === 'lanjut_noo' && !!lastPos;
+    const noo = W.status === 'lanjut_noo' && !!p.lat;
     try{ tutupKatalog(); }catch(e){}
     tutupWizard();
     toast(noo ? 'Temuan tersimpan — Lanjut NOO! (terkirim otomatis)' : 'Temuan tersimpan (terkirim otomatis)', 3600);
@@ -2140,7 +2261,7 @@ async function buatFotoBerwatermark(file){
   if(w > MAX || h > MAX){ const sk = MAX/Math.max(w, h); w = Math.round(w*sk); h = Math.round(h*sk); }
   const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
   const ctx = cv.getContext('2d'); ctx.drawImage(img, 0, 0, w, h);
-  const lat = lastPos ? lastPos.lat : null, lon = lastPos ? lastPos.lon : null, acc = lastPos ? lastPos.acc : null;
+  const pp = posTemuan(), lat = pp ? pp.lat : null, lon = pp ? pp.lon : null, acc = pp ? pp.acc : null;
   const now = new Date();
   const namaToko = (W && W.nama.trim()) || '-';
   let alamat = 'Alamat tidak tersedia (lat/lon saja)';
@@ -2217,7 +2338,7 @@ window.onBackNative = function(){
   if($('modalKatalog').style.display === 'flex'){ tutupKatalog(); return true; }
   if($('popupProspek').style.display === 'flex'){ jawabProspekTidak(); return true; }
   if($('modalManualBackdrop').style.display === 'flex'){ tutupModalManual(); return true; }
-  if(screenAktif === 'scrTemuan'){ wizBack(); return true; }
+  if(screenAktif === 'scrTemuan'){ if(!W && RD){ tutupDetailTemuan(); return true; } wizBack(); return true; }
   if(screenAktif === 'scrPeta'){ if($('searchTokoPanel').style.display === 'block'){ toggleSearchToko(); return true; } kembaliKeDaftar(); return true; }
   if(screenAktif === 'scrSetuju' && sesi){ return false; }
   if(screenAktif === 'scrMain' && tabAktif !== 'beranda'){ bukaTab('beranda'); return true; }
