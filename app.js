@@ -6,7 +6,7 @@
    ============================================================ */
 const SUPABASE_URL = 'https://bgvdrinvblanlaykydit.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_EMHLQqIuGbFaCBUYkV5yVw_X_yR_aKZ';
-const APP_VERSI = '1.2.2';
+const APP_VERSI = '1.2.3';
 const S = 0.01;       // ukuran petak (derajat)
 const GRID_N = 4;     // 4x4 = 16 kotak per petak
 const NAMA_PRIO = ['-', 'A', 'B', 'C'];
@@ -85,6 +85,45 @@ function peranNama(n){ const m = /^(RBM|BM|ASS)\b\s*-/i.exec(String(n || '').tri
 function namaDepan(n){ const b = namaBersih(n).split(/\s+/); return (b[0] && b[0].length <= 2 && b[1]) ? b[0] + ' ' + b[1] : (b[0] || ''); }
 function inisial(n){ const b = namaBersih(n).replace(/[^A-Za-z\s]/g, '').split(/\s+/).filter(Boolean); return ((b[0] || '?')[0] + (b[1] ? b[1][0] : (b[0] || '')[1] || '')).toUpperCase(); }
 
+/* ---------- dialog bermerek SkyLens (pengganti confirm()/prompt() bawaan Android) ----------
+   dialogSL({ikon, nada:'or'|'merah'|'navy', judul, teks, html, input:{placeholder, cek:fn(v)->pesan galat|''}, ok, batal})
+   -> Promise: true/false (konfirmasi) atau string/null (pakai input) */
+function dialogSL(o){
+  return new Promise(res => {
+    const lama = document.getElementById('dlgSL'); if(lama) lama.remove();
+    const w = document.createElement('div'); w.id = 'dlgSL'; w.className = 'dlg-ov';
+    const nada = o.nada || 'or';
+    w.innerHTML = '<div class="dlg ' + nada + '" role="dialog" aria-modal="true" aria-labelledby="dlgJdl">' +
+      (o.atas || ('<div class="dlg-ik">' + ico(o.ikon || 'info') + '</div>')) +
+      '<h3 id="dlgJdl">' + esc(o.judul || '') + '</h3>' +
+      (o.teks ? '<p class="dlg-t">' + esc(o.teks) + '</p>' : '') + (o.html || '') +
+      (o.input ? '<div class="dlg-in"><input id="dlgIn" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="' + esc(o.input.placeholder || '') + '"' + (o.input.numerik ? ' inputmode="numeric"' : '') + '>' +
+        '<button type="button" class="dlg-eye" id="dlgEye" aria-label="Tampilkan password">' + ico('eye') + '</button></div><p class="dlg-err" id="dlgErr"></p>' : '') +
+      '<div class="dlg-act"><button type="button" class="btn gh sm" id="dlgNo">' + esc(o.batal || 'Batal') + '</button>' +
+      '<button type="button" class="btn sm dlg-ok" id="dlgYa">' + esc(o.ok || 'OK') + '</button></div></div>';
+    document.getElementById('app').appendChild(w);
+    requestAnimationFrame(() => w.classList.add('on'));
+    const inp = w.querySelector('#dlgIn'), err = w.querySelector('#dlgErr'), kotak = w.querySelector('.dlg');
+    const tutup = v => { w.classList.remove('on'); setTimeout(() => w.remove(), 160); dialogSL.buka = null; res(v); };
+    dialogSL.buka = () => tutup(o.input ? null : false);   // tombol kembali Android
+    const ya = () => {
+      if(!o.input) return tutup(true);
+      const v = inp.value, salah = o.input.cek ? o.input.cek(v) : '';
+      if(salah){ err.textContent = salah; kotak.classList.remove('goyang'); void kotak.offsetWidth; kotak.classList.add('goyang'); inp.select(); return; }
+      tutup(v);
+    };
+    w.querySelector('#dlgYa').onclick = ya;
+    w.querySelector('#dlgNo').onclick = () => tutup(o.input ? null : false);
+    w.addEventListener('click', e => { if(e.target === w) tutup(o.input ? null : false); });
+    if(inp){
+      inp.addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); ya(); } });
+      inp.addEventListener('input', () => { err.textContent = ''; });
+      w.querySelector('#dlgEye').onclick = () => { inp.type = inp.type === 'password' ? 'text' : 'password'; inp.focus(); };
+      setTimeout(() => inp.focus(), 120);
+    }
+  });
+}
+
 /* ---------- ikon ---------- */
 const IC = {
   back:'<path d="M15 5 8 12l7 7"/>', close:'<path d="M6 6l12 12M18 6 6 18"/>', check:'<path d="m5 12 4.5 4.5L19 7"/>',
@@ -92,7 +131,7 @@ const IC = {
   cam:'<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>', store:'<path d="M4 9h16l-2-5H6z"/><path d="M5 9v11h14V9"/><path d="M10 20v-6h4v6"/>',
   nav:'<path d="M3 11 21 3l-8 18-2-8z"/>', book:'<path d="M4 5h7a2 2 0 0 1 2 2v12a2 2 0 0 0-2-2H4z"/><path d="M20 5h-5a2 2 0 0 0-2 2v12a2 2 0 0 1 2-2h5z"/>',
   chev:'<path d="m9 6 6 6-6 6"/>', info:'<circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/>', cloud:'<path d="M7 18a4.5 4.5 0 0 1-.5-9 6 6 0 0 1 11.5 1.5A3.75 3.75 0 0 1 17.5 18z"/><path d="m9.5 13 2 2 3.5-4"/>',
-  search:'<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>', lock:'<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>', pin:'<path d="M12 21s7-6.2 7-11a7 7 0 0 0-14 0c0 4.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/>'
+  search:'<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>', eye:'<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>', logout:'<path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4"/><path d="M10 16l-4-4 4-4M6 12h10"/>', refresh:'<path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v5h-5"/>', gps:'<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>', lock:'<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>', pin:'<path d="M12 21s7-6.2 7-11a7 7 0 0 0-14 0c0 4.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/>'
 };
 const ico = (n, st) => '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true" style="' + (st || '') + '">' + IC[n] + '</svg>';
 const flameSvg = (lit, cls, st) => '<svg class="' + (cls || '') + '" viewBox="0 0 34 40" aria-hidden="true" style="' + (st || '') + '"><path d="M17 2c2 7 12 11 12 23a12 12 0 0 1-24 0c0-6 3-9 5-12 1 4 3 5 4 5-1-6 1-11 3-16Z" fill="' + (lit ? '#FE7A1B' : '#C9D2E3') + '"/><path d="M17 20c1 4 6 6 6 11a6 6 0 0 1-12 0c0-3 2-5 3-6 0 2 1 3 2 3 0-3 0-5 1-8Z" fill="' + (lit ? '#FFC08F' : '#E3E7EE') + '"/></svg>';
@@ -311,8 +350,14 @@ function stopBerandaTimer(){ if(berandaTimer){ clearInterval(berandaTimer); bera
     $('fldDepot').classList.toggle('on', !!this.value);
     if(!this.value){ resetNama(); return; }
     if(this.value === 'TESTING'){
-      const pw = prompt('Area TESTING khusus internal. Masukkan password:');
-      if(pw !== TESTING_PW){ if(pw !== null) alert('Password salah.'); this.value = ''; $('fldDepot').classList.remove('on'); resetNama(); return; }
+      const self = this;
+      dialogSL({ikon: 'lock', nada: 'navy', judul: 'Area TESTING', teks: 'Khusus tim internal untuk uji coba. Masukkan password untuk lanjut.',
+        input: {placeholder: 'Password', numerik: true, cek: v => v === TESTING_PW ? '' : (v ? 'Password salah, coba lagi.' : 'Isi password dulu.')}, ok: 'Masuk', batal: 'Batal'})
+        .then(pw => {
+          if(pw !== TESTING_PW){ self.value = ''; $('fldDepot').classList.remove('on'); resetNama(); return; }
+          pilihDepot('TESTING');
+        });
+      return;
     }
     pilihDepot(this.value);
   });
@@ -326,8 +371,10 @@ function resetNama(){
 }
 /* RBM/BM/ASS tidak ada di aplikasi (mereka masuk lewat dashboard). Buang dari daftar nama, apa pun sumbernya (bawaan, cache, Supabase). */
 function gabungManajer(dep, r){
-  return r.filter(x => !/^(RBM|BM|ASS)\s*-/i.test(String((x && x[1]) || '').trim()) && !/^(RBM|BM|ASS)-/i.test(String((x && x[0]) || '')));
+  return r.filter(x => !/^(RBM|BM|ASS)\s*-/i.test(String((x && x[1]) || '').trim()) && !/^(RBM|BM|ASS)-/i.test(String((x && x[0]) || '')))
+          .filter(x => !/^(AEPDA|GLKDA)\b/i.test(String((x && x[1]) || '').trim()));   // SkyLens 2.0 fokus GDKDA: AEPDA & GLKDA tidak ikut
 }
+function tipeSales(n){ const m = /^(GDKDA|AEPDA|GLKDA)\b/i.exec(String(n || '').trim()); return m ? m[1].toUpperCase() : ''; }
 async function muatRoster(dep){
   const bawaan = (ROSTER[dep] || []).map(s => [String(s[0]), s[1]]);
   try{
@@ -345,7 +392,7 @@ async function pilihDepot(dep){
   if($('depotInput').value !== dep) return;   // pengguna sudah ganti area lagi
   roster = roster.filter(s => !/^vacant$/i.test(namaBersih(s[1]))).sort((a, b) => ((peranNama(a[1]) ? 1 : 0) - (peranNama(b[1]) ? 1 : 0)) || namaBersih(a[1]).localeCompare(namaBersih(b[1])));
   const sel = $('kodeInput'); sel.innerHTML = '<option value="">Pilih namamu…</option>';
-  roster.forEach(s => { const o = document.createElement('option'); o.value = s[0]; o.textContent = (peranNama(s[1]) ? '[' + peranNama(s[1]) + '] ' : '') + namaBersih(s[1]) + (peranNama(s[1]) ? '' : ' · ' + s[0]); o.dataset.nama = s[1]; sel.appendChild(o); });
+  roster.forEach(s => { const o = document.createElement('option'); o.value = s[0]; o.textContent = (peranNama(s[1]) ? '[' + peranNama(s[1]) + '] ' : '') + (tipeSales(s[1]) ? tipeSales(s[1]) + ' · ' : '') + namaBersih(s[1]) + (peranNama(s[1]) ? '' : ' · ' + s[0]); o.dataset.nama = s[1]; sel.appendChild(o); });
   sel.disabled = false; $('fldNama').classList.remove('dis');
   if(!roster.length) toast('Belum ada nama sales untuk area ini. Hubungi admin.', 4000);
 }
@@ -370,8 +417,16 @@ async function masuk(){
   } finally { btn.disabled = !$('kodeInput').value; btn.textContent = 'Masuk'; }
 }
 
-function keluar(){
-  if(!confirm('Keluar sebagai ' + (sesi ? namaBersih(sesi.nama) : '') + '? Perekaman jejak akan berhenti.')) return;
+async function keluar(){
+  if(!sesi) return;
+  const nm = namaBersih(sesi.nama), inf = infoNative(), tunggu = (obSisa || 0) + (inf.pending || 0);
+  const ok = await dialogSL({nada: 'merah', judul: 'Keluar dari SkyLens?',
+    atas: '<div class="dlg-av">' + esc(inisial(sesi.nama)) + '</div>',
+    html: '<div class="dlg-who"><b>' + esc(nm) + '</b><span>' + esc(String(sesi.kode)) + ' · ' + esc(sesi.depot) + '</span></div>' +
+      '<ul class="dlg-li"><li>' + ico('gps') + 'Perekaman jejak GPS berhenti sampai kamu masuk lagi.</li>' +
+      (tunggu ? '<li class="warn">' + ico('cloud') + ((inf.pending || 0) ? (inf.pending + ' titik') : '') + ((inf.pending || 0) && obSisa ? ' · ' : '') + (obSisa ? obSisa + ' data' : '') + ' belum terkirim. Kami coba kirim sekarang; sisanya tetap aman di HP.</li>' : '<li>' + ico('check') + 'Semua data sudah terkirim.</li>') + '</ul>',
+    ok: 'Keluar', batal: 'Batal'});
+  if(!ok) return;
   try{ nat().kirimSekarang(); nat().berhenti(); }catch(e){}
   stopPoll(); sesi = null; lsDel('sl2_sesi');
   zonaAktif = null; trailPoints = []; lastSaved = null; lastPos = null; lastSeq = 0; zonaList = []; manualList = []; zonaState = {mode: 'memuat', pesan: ''};
@@ -581,6 +636,28 @@ function petakMisi(){
   return zonaList[0];
 }
 /* Misi 1: tiap toko sedotan di JKS hari ini diganti satu temuan RT-L baru (target maks 10 per hari). */
+/* Target NOO harian DINAMIS (v1.2.3): mengikuti JKS hari ini.
+   S = toko sedotan di JKS hari ini (maks 10) -> itu yang harus diganti, jadi target = S.
+   P = peluang RT-L (prediksi - yang sudah ada) di petak tugas yang SEARAH JKS hari ini; ditampilkan sebagai "peluang yang sudah ditandai Pinpin".
+   JKS tanpa toko sedotan -> target = peluang RT-L di petak searah (1-3). Tidak ada data JKS / hari Minggu -> 3 (bawaan). */
+function targetHarian(){
+  const bawaan = {T: TARGET_NOO_HARIAN, S: 0, P: 0, nP: 0, dinamis: false};
+  try{
+    if(!sesi || peranSesi()) return bawaan;
+    const g = jksHariD(); if(g.getDay() === 0) return bawaan;
+    const k = tglKunci(g) + '|' + (OUTLET ? OUTLET.length : 0) + '|' + (zonaList ? zonaList.length : 0) + '|' + sesi.kode;
+    if(targetHarian.k === k && targetHarian.v) return targetHarian.v;
+    const jh = jksHariIni(g); if(!jh) return bawaan;
+    const S = Math.min((jh.toko_sedotan || []).length, 10);
+    const jp = jksPetakSegar() || {};
+    const searah = (zonaList || []).filter(z => jp[keyDari(z[2], z[3])] && zonaTampil(z));
+    const P = searah.reduce((a, z) => a + prediksiPetak(z).tL, 0);
+    const v = {T: S > 0 ? S : Math.max(1, Math.min(P, 3)), S: S, P: P, nP: searah.length, dinamis: true, sedotan: jh.toko_sedotan || [], kode_jks: jh.kode_jks};
+    targetHarian.k = k; targetHarian.v = v;
+    return v;
+  }catch(e){ return bawaan; }
+}
+window.targetNooHarian = () => targetHarian().T;
 function misiGanti(){
   try{
     const g = jksHariD();
@@ -588,17 +665,28 @@ function misiGanti(){
     if(g.getDay() === 0) return {id: 'ganti', kunci: true, pendek: 'Ganti toko sedotan dengan RT-L', tag: 'Libur', teks: 'Hari Minggu tidak ada JKS. Selamat istirahat, besok misi ini aktif lagi!'};
     const jh = jksHariIni(g);
     if(!jh) return {id: 'ganti', kunci: true, pendek: 'Ganti toko sedotan dengan RT-L', tag: 'JKS belum ada', teks: 'JKS kamu belum ada di data depo ini, jadi daftar toko sedotan belum bisa ditampilkan. Tetap cari RT-L di sekitarmu ya!'};
-    const sed = jh.toko_sedotan || [];
-    if(!sed.length) return {id: 'ganti', kunci: false, done: true, p: 1, pendek: 'JKS hari ini tanpa toko sedotan', tag: '✓', teks: 'Mantap, JKS kamu hari ini (' + esc(jh.kode_jks) + ') tidak punya toko sedotan. Tetap cari RT-L di sekitar rutemu ya!'};
+    const sed = jh.toko_sedotan || [], th = targetHarian(), P = th.P, nP = th.nP;
     const w = wibDate(), mulai = Date.UTC(w.getUTCFullYear(), w.getUTCMonth(), w.getUTCDate()) - 7 * 3600e3;
-    const target = Math.min(sed.length, 10);
     const ada = temuanGabungan().filter(x => x.uk === 'RT-L' && x.st !== 'sudah_dicover' && x.t >= mulai).length;
+    const petakTxt = '<b>' + nP + ' petak searah JKS</b>';
+    if(!sed.length){
+      const tgt = th.T, done = ada >= tgt;
+      return {id: 'ganti', kunci: false, done: done, p: Math.min(1, ada / tgt), pendek: 'JKS bersih dari toko sedotan · bonus RT-L ' + Math.min(ada, tgt) + '/' + tgt, tag: done ? '✓' : Math.round(Math.min(1, ada / tgt) * 100) + '%',
+        teks: 'Mantap, JKS kamu hari ini (' + esc(jh.kode_jks) + ') bersih dari toko sedotan! ' + (nP && P ? 'Di ' + petakTxt + ' Pinpin lihat ada <b>±' + P + ' peluang RT-L</b>. ' : '') + 'Kejar bonus <b>' + tgt + ' toko RT-L baru</b> ya. Sudah ketemu ' + Math.min(ada, tgt) + (done ? ', target tercapai!' : ', yuk lanjut!')};
+    }
+    const target = th.T;
     const done = ada >= target, p = Math.min(1, ada / target);
     const nama = sed.slice(0, 3).map(x => '<b>' + esc(String(x.nama || x.kode).replace(/,\s*(TK|TOKO)$/i, '')) + '</b>').join(', ');
+    /* bingkai positif: prediksi = peluang yang SUDAH ditandai Pinpin; kalau kurang dari target, sisanya diarahkan ke rute JKS (bukan "cuma") */
+    let peluang;
+    if(!nP) peluang = 'Hari ini belum ada petak tugasmu yang searah JKS, jadi incar toko besar di sepanjang rute JKS-mu ya.';
+    else if(P >= target) peluang = 'Kabar baik: di ' + petakTxt + ' Pinpin lihat ada <b>±' + P + ' peluang RT-L</b>, lebih dari cukup buat gantiin semuanya!';
+    else if(P > 0) peluang = 'Pinpin sudah tandai <b>' + P + ' peluang RT-L</b> di ' + petakTxt + '. Sisanya biasanya nongol di jalan besar sepanjang rute JKS-mu, pasang mata elang ya!';
+    else peluang = 'Petak searah JKS sudah ramai RT-L, jadi Pinpin yakin toko besar barunya ada di jalan besar sepanjang rute JKS-mu.';
     return {id: 'ganti', kunci: false, done: done, p: p,
-      pendek: 'RT-L pengganti ' + Math.min(ada, target) + '/' + target + ' (' + sed.length + ' toko sedotan di JKS hari ini)',
+      pendek: 'RT-L pengganti ' + Math.min(ada, target) + '/' + target + ' (' + sed.length + ' toko sedotan' + (nP ? ' · ±' + P + ' peluang di petak searah' : '') + ')',
       tag: done ? '✓' : Math.round(p * 100) + '%',
-      teks: 'Di JKS hari ini ada <b>' + sed.length + ' toko sedotan</b>, antara lain ' + nama + '. Targetmu <b>' + target + ' toko RT-L baru</b> di sekitar rute untuk menggantikannya. Sudah ketemu ' + Math.min(ada, target) + (done ? ' — target tercapai, mantap!' : ', yuk lanjut!')};
+      teks: 'Di JKS hari ini ada <b>' + sed.length + ' toko sedotan</b>, antara lain ' + nama + '. Targetmu <b>' + target + ' toko RT-L baru</b> untuk menggantikannya. ' + peluang + ' Sudah ketemu ' + Math.min(ada, target) + (done ? ' — target tercapai, mantap!' : ', yuk lanjut!')};
   }catch(e){ return null; }
 }
 function hitungMisi(){
@@ -935,14 +1023,14 @@ function kalimatSambutan(d){
 
 function heroHtml(){
   const rk = hitungRingkasan(), mm = hitungMisi();
-  const pct = Math.min(100, Math.round(rk.hari_ini.noo / TARGET_NOO_HARIAN * 100));
+  const TH = targetHarian().T, pct = Math.min(100, Math.round(rk.hari_ini.noo / TH * 100));
   const lines = mm.misi.map((m, i) =>
     '<div class="ms' + (m.kunci ? ' lock' : '') + '"><span class="ck' + (m.done ? ' done' : '') + '">' + (m.done ? ico('check', 'width:13px;height:13px;stroke-width:3') : (m.kunci ? ico('lock', 'width:12px;height:12px;stroke-width:2') : (i + 1))) + '</span>' +
     '<span class="tx">' + esc(m.pendek) + '</span><span class="tag">' + esc(m.tag) + '</span></div>').join('');
   return '<button type="button" class="hero" onclick="petBuka()" aria-label="Buka panel Pinpin">' +
     '<div class="row" style="justify-content:space-between"><span class="mpT" style="font-size:13px;font-weight:700"><svg class="pinIco" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C16.4 2 19 5 19 8.8 19 13 14.4 15.6 12 22 9.6 15.6 5 13 5 8.8 5 5 7.6 2 12 2Z" fill="#fff"/><circle cx="12" cy="8.9" r="2.9" fill="#E8620C"/></svg>Misi dari Pinpin</span>' +
     '<span class="pill">' + flameSvg(rk.streak_nyala, '', 'width:11px;height:13px') + rk.streak + ' hari</span></div>' +
-    '<div style="display:flex;align-items:baseline;gap:6px"><b style="font-size:38px;line-height:1">' + rk.hari_ini.noo + '</b><span style="font-size:16px;font-weight:600">/ ' + TARGET_NOO_HARIAN + ' NOO hari ini</span></div>' +
+    '<div style="display:flex;align-items:baseline;gap:6px"><b style="font-size:38px;line-height:1">' + rk.hari_ini.noo + '</b><span style="font-size:16px;font-weight:600">/ ' + TH + ' NOO hari ini</span></div>' +
     '<div class="bar"><i style="width:' + pct + '%"></i></div>' +
     '<div style="display:flex;justify-content:space-between;font-size:12.5px"><span>' + rk.hari_ini.temuan + ' temuan hari ini · total ' + rk.total_noo + ' NOO</span><b>' + pct + '%</b></div>' +
     '<div>' + lines + '</div>' +
@@ -1150,7 +1238,7 @@ function uiKartu(){
     (u.pending ? '<button class="btn sm" onclick="uiTerapkanSekarang()">Pakai versi baru sekarang</button>' : '') + '</div></section>';
 }
 function uiCekSekarang(){ try{ Android.uiCek(); toast('Memeriksa pembaruan...', 2200); }catch(e){} setTimeout(() => { if(tabAktif === 'akun') renderAkun(); }, 4000); setTimeout(() => { if(tabAktif === 'akun') renderAkun(); }, 12000); }
-function uiTerapkanSekarang(){ if(confirm('Muat ulang tampilan dengan versi baru? Isian yang belum disimpan akan hilang.')){ try{ Android.uiTerapkan(); }catch(e){} } }
+async function uiTerapkanSekarang(){ if(await dialogSL({ikon: 'refresh', judul: 'Pakai versi baru?', teks: 'Tampilan akan dimuat ulang dengan versi terbaru. Isian yang belum disimpan akan hilang.', ok: 'Muat ulang', batal: 'Nanti'})){ try{ Android.uiTerapkan(); }catch(e){} } }
 
 /* ---------- AKUN ---------- */
 function renderAkun(){
@@ -1266,7 +1354,15 @@ function buatHybrid(){ return L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x
    Arah dihitung dari jarak tempuh >=9 m (bukan dari tiap titik GPS, supaya tidak muter-muter saat diam). Hanya aktif saat mengikuti posisi di dalam zona. */
 let sweepMin = (lsGet('sl2_sweepmin', true) !== false);
 function toggleSweep(){ sweepMin = !sweepMin; lsSet('sl2_sweepmin', sweepMin); const sw = $('sweepcard'); if(sw) sw.dataset.sig = ''; renderPosisi(); }
-let headUp = (lsGet('sl2_headup', true) !== false), headDeg = null, headAnchor = null, bearTween = null;
+/* v1.2.3: seperti Google Maps — peta otomatis berputar mengikuti arah jalan selama mode ikuti (tombol panah/recenter).
+   Peta digeser/diputar dua jari -> berhenti mengikuti & berhenti berputar otomatis; ketuk tombol panah -> ikuti + putar otomatis lagi.
+   Kompas hanya muncul saat peta miring; ketuk kompas -> utara kembali di atas (tetap mengikuti posisi, tanpa putar otomatis). */
+let utaraKunci = false, headDeg = null, headAnchor = null, bearTween = null;
+function tampilRecenter(){ const b = $('recenterBtn'); if(b) b.style.display = (!followMode || utaraKunci) ? 'flex' : 'none'; }
+function arahIkut(){
+  if(typeof PD !== 'undefined' && PD.aktif && typeof pdArahDepan === 'function'){ const a = pdArahDepan(); if(a != null) return a; }
+  return headDeg;
+}
 function selisihDeg(a, b){ return ((b - a + 540) % 360) - 180; }
 function perbaruiArah(lat, lon, acc){
   if(acc && acc > 40) return;
@@ -1293,17 +1389,19 @@ function setBearAnim(target){
 }
 function terapkanArahPeta(){
   if(!map || !map.setBearing) return;
-  const ikut = headUp && followMode && lastPos && zonaAktif && insideZone(lastPos.lat, lastPos.lon);
-  if(ikut){ if(headDeg != null){ const tgt = (360 - headDeg) % 360; if(Math.abs(selisihDeg(map.getBearing(), tgt)) >= 12) setBearAnim(tgt); } }   // ambang 12°: tidak menggambar ulang jalan tiap goyangan kecil   // peta diputar berlawanan arah jarum jam sebesar arah gerak -> arah gerak menghadap atas
-  else if(Math.abs(selisihDeg(map.getBearing(), 0)) > 1.5) setBearAnim(0);
+  const pandu = typeof PD !== 'undefined' && PD.aktif, pos = pandu ? (pdPos() || lastPos) : lastPos;
+  const ikutPosisi = followMode && pos && zonaAktif && (pandu || insideZone(pos.lat, pos.lon));
+  const h = (ikutPosisi && !utaraKunci) ? arahIkut() : null;
+  if(h != null){ const tgt = (360 - h) % 360; if(Math.abs(selisihDeg(map.getBearing(), tgt)) >= 12) setBearAnim(tgt); }   // ambang 12°: tidak menggambar ulang jalan tiap goyangan kecil; peta diputar berlawanan arah gerak -> arah gerak menghadap atas
+  else if(followMode && (utaraKunci || !ikutPosisi) && Math.abs(selisihDeg(map.getBearing(), 0)) > 1.5) setBearAnim(0);   // mode ikuti tapi tidak bergerak di jalur: utara di atas. Peta yang diputar sendiri (followMode mati) dibiarkan.
   perbaruiKompas();
 }
-function degPanah(){ const h = headDeg != null ? headDeg : ((lastPos && lastPos.brg) || 0); return (h + (map && map.getBearing ? map.getBearing() : 0) + 360) % 360; }
+function degPanah(){ const r = (typeof PD !== 'undefined' && PD.aktif && typeof pdArahDepan === 'function') ? pdArahDepan() : null; const h = r != null ? r : (headDeg != null ? headDeg : ((lastPos && lastPos.brg) || 0)); return (h + (map && map.getBearing ? map.getBearing() : 0) + 360) % 360; }
 function setPanahDeg(){ try{ const d = youMarker && youMarker._icon && youMarker._icon.firstChild; if(d) d.style.transform = 'rotate(' + degPanah() + 'deg)'; }catch(e){} }
 function perbaruiKompas(){
   const b = $('compassBtn'), ic = $('compassIco'); if(!b || !map) return;
-  b.classList.toggle('off', !headUp);
-  b.setAttribute('aria-pressed', headUp ? 'true' : 'false');
+  const miring = !!(map.getBearing && Math.abs(selisihDeg(map.getBearing(), 0)) > 3);
+  b.style.display = (map.setBearing && miring) ? 'flex' : 'none';
   if(ic && map.getBearing) ic.style.transform = 'rotate(' + map.getBearing() + 'deg)';
 }
 function arrowIcon(deg, besar){
@@ -1407,14 +1505,16 @@ function petaSemuaSheet(){
     const z = zonaList[allSel], key = keyDari(z[2], z[3]), n = progresZona(key), pr = NAMA_PRIO[z[23]] || '-';
     let d = null, here = false; if(lastPos){ d = jarakKeTepiZona(z, lastPos.lat, lastPos.lon); here = d < 1; }
     h += '<div class="row" style="justify-content:space-between;align-items:flex-start"><div class="col" style="gap:2px"><b style="font-size:17px">' + esc(z[11] || ('Petak ' + key)) + '</b><span class="muted" style="font-size:13px">' + esc(kecZona(z)) + ' · ' + (d == null ? 'mencari lokasi…' : (here ? 'kamu di sini' : fmtJarak(d))) + ' · ' + teksKotak(n, nKotak(key)) + (nKotak(key) ? ' kotak' : '') + '</span></div><span class="prio p' + (pr === '-' ? 'X' : pr) + '">Prioritas ' + pr + '</span></div>' +
-      '<div class="bar-actions">' + (here ? '<button class="btn or" onclick="bukaZonaIdx(' + allSel + ')">Lanjut sisir</button>' : '<button class="btn or" onclick="navigasiKeZona(' + allSel + ')">Arahkan</button>') +
+      '<div class="bar-actions">' + (here ? '<button class="btn or" onclick="bukaZonaIdx(' + allSel + ')">Lanjut sisir</button>' : '<button class="btn or" onclick="navigasiKeZona(' + allSel + ')">' + ico('nav') + 'Gass ke petak</button>') +
       '<button class="btn gh" onclick="bukaZonaIdx(' + allSel + ')">Detail zona</button></div>';
   }
   if(sh.dataset.sig !== h){ sh.innerHTML = h; sh.dataset.sig = h; }
 }
+/* Peta → "Gass ke petak": buka petak di app & langsung pandu SkyLens (tanpa keluar ke Google Maps) */
 function navigasiKeZona(i){
-  const z = zonaList[i]; const b = batasZona(z);
-  try{ nat().bukaNavigasi((b.lat0 + b.lat1)/2, (b.lon0 + b.lon1)/2, z[11] || 'Zona'); }catch(e){ bukaMaps((b.lat0 + b.lat1)/2, (b.lon0 + b.lon1)/2); }
+  const z = zonaList[i]; if(!z) return;
+  bukaZona(z);
+  if(typeof pdTersedia === 'function' && pdTersedia()) pdMulai();
 }
 (function pasangCariSemua(){
   const q = $('qAll'), box = $('allRes'); let hasil = [];
@@ -1450,26 +1550,28 @@ function bukaMaps(lat, lon){ nat().bukaUrl('https://www.google.com/maps?q=' + la
 function siapkanLayarPeta(){
   tampil('scrPeta');
   tutupSearchToko();
-  followMode = true; $('recenterBtn').style.display = 'none';
+  followMode = true; utaraKunci = false; tampilRecenter();
   zInfoOpen = false; $('zoneSheet').dataset.sig = ''; $('sweepcard').dataset.sig = '';
 }
 function buatPeta(zoom){
   if(map){ map.remove(); map = null; }
-  map = L.map('map', {zoomControl: false, attributionControl: false, rotate: !!(L.Map && L.Map.prototype.setBearing), touchRotate: false, shiftKeyRotate: false, rotateControl: false, bearing: 0}).setView([CENTER.lat, CENTER.lon], zoom);
+  map = L.map('map', {zoomControl: false, attributionControl: false, rotate: !!(L.Map && L.Map.prototype.setBearing), touchRotate: !!(L.Map && L.Map.prototype.setBearing), shiftKeyRotate: false, rotateControl: false, bearing: 0}).setView([CENTER.lat, CENTER.lon], zoom);
   map.on('popupopen', e => {
     /* buka kartu toko: berhenti mengikuti & kembali ke utara-di-atas supaya kartu tidak bergeser/miring dan peta tidak lompat ke posisi kamu */
-    if(followMode){ followMode = false; $('recenterBtn').style.display = 'flex'; }
+    if(followMode){ followMode = false; tampilRecenter(); }
     if(map.getBearing && Math.abs(map.getBearing()) > 0.5){ batalBearTween(); map.setBearing(0); perbaruiKompas(); }
     ajusPopup(map, e.popup);
   });
   headDeg = null; headAnchor = null;
-  $('compassBtn').style.display = map.setBearing ? 'flex' : 'none'; perbaruiKompas();
+  perbaruiKompas();
+  map.on('rotasimanual', () => { batalBearTween(); followMode = false; tampilRecenter(); });   // diputar dua jari: berhenti putar otomatis
+  map.on('rotate', () => { setPanahDeg(); perbaruiKompas(); });
   siapkanPane(map);
   const hybrid = buatHybrid().addTo(map);
   pasangBasemapToggle(map, hybrid);
   if(typeof jlLegenda === 'function') jlLegenda(map);
-  const matikanFollow = () => { followMode = false; $('recenterBtn').style.display = 'flex'; terapkanArahPeta(); };
-  map.on('dragstart', matikanFollow); map.on('zoomstart', matikanFollow);
+  const matikanFollow = () => { if(!followMode) return; followMode = false; batalBearTween(); tampilRecenter(); perbaruiKompas(); };
+  map.on('dragstart', matikanFollow);   // seperti Google Maps: geser = berhenti mengikuti; zoom (pinch/tombol) tetap mengikuti posisi
   trailLayer = L.layerGroup().addTo(map);
   cellLayer = L.layerGroup().addTo(map);
   gambarUlangSeluruhJejak();
@@ -1600,6 +1702,7 @@ function bukaZona(z){
   zonaAktif = {key_petak: key, kecamatan: namaZona(z), kabupaten: z[13] || sesi.depot, gx: z[2], gy: z[3], manual: false, z: z};
   siapkanLayarPeta();
   $('zoneTitle').textContent = z[11] || ('Petak ' + key);
+  $('zoneEta').textContent = '';
   const pr = NAMA_PRIO[z[23]] || '-';
   $('zoneAddr').textContent = kecZona(z) + ' · Petak ' + key + ' · Prioritas ' + pr;
   $('topcardNav').classList.remove('open'); $('zoneSub').dataset.sig = '';
@@ -1650,14 +1753,18 @@ function kembaliKeDaftar(){
 }
 function panKeZonaAktif(){
   if(!map || !CENTER) return;
-  followMode = false; $('recenterBtn').style.display = 'flex';
+  followMode = false; tampilRecenter();
   map.flyTo([CENTER.lat, CENTER.lon], 16, {duration: 0.6});
 }
-$('recenterBtn').addEventListener('click', () => { followMode = true; $('recenterBtn').style.display = 'none'; if(lastPos && map) map.panTo([lastPos.lat, lastPos.lon], {animate: true}); terapkanArahPeta(); });
-$('compassBtn').addEventListener('click', () => {
-  headUp = !headUp; lsSet('sl2_headup', headUp);
-  toast(headUp ? 'Peta ikut arah jalanmu' : 'Peta tetap utara di atas', 1800);
-  terapkanArahPeta(); perbaruiKompas();
+$('recenterBtn').addEventListener('click', () => {
+  followMode = true; utaraKunci = false; tampilRecenter();
+  const p = (typeof PD !== 'undefined' && PD.aktif) ? (pdPos() || lastPos) : lastPos;
+  if(p && map) map.setView([p.lat, p.lon], Math.max(map.getZoom(), 17), {animate: true});
+  if(typeof renderPosisi === 'function') renderPosisi(true); else terapkanArahPeta();
+});
+$('compassBtn').addEventListener('click', () => {   // kompas: kembalikan utara ke atas
+  utaraKunci = true; batalBearTween(); setBearAnim(0); tampilRecenter();
+  setTimeout(perbaruiKompas, 500);
 });
 
 /* ---------- cari toko ---------- */
@@ -1851,6 +1958,7 @@ function renderPosisi(paksa){
       : '<div class="jlKosong"><b>Petak ini tidak ada permukiman</b><span>Tidak perlu disisir — tidak ada atap rumah di citra satelit. Lanjut ke zona lain ya!</span></div>') +
       (adaJl ? jlKartuHtml(keyZ, zInfoOpen) : '') +
       (z ? '<button type="button" onclick="zInfoOpen=!zInfoOpen;renderPosisi()" style="border:0;background:var(--ground);border-radius:12px;padding:10px;font-size:13px;font-weight:700;min-height:42px">' + (adaJl ? 'Nama jalan & info zona ' : 'Info zona lengkap ') + (zInfoOpen ? '▲' : '▼') + '</button>' + (zInfoOpen ? infoZonaHtml(z) : '') : '') + (sweepMin ? '' : '<button type="button" class="swKecil" onclick="toggleSweep()">Kecilkan kartu ▲</button>');
+    if($('zoneEta').textContent) $('zoneEta').textContent = '';
     sw.classList.toggle('swmin', !!sweepMin);
     if(sw.dataset.sig !== html){ sw.innerHTML = html; sw.dataset.sig = html; }
     const sh = '<i class="grab"></i><div class="bar-actions"><button class="btn or" style="flex:2" onclick="bukaWizard()">' + ico('plus', 'stroke-width:2.4') + 'Catat temuan</button><button class="btn gh" style="flex:1;white-space:nowrap" onclick="toggleSearchToko()">' + ico('search') + 'Cek toko</button></div>';
@@ -1859,6 +1967,8 @@ function renderPosisi(paksa){
     sw.style.display = 'none'; nv.style.display = 'flex';
     const z = zonaAktif.z;
     const pdSub = (typeof PD !== 'undefined' && PD.aktif) ? pdNavSub() : null;
+    const eta = pdSub && typeof pdTiba === 'function' ? pdTiba() : '';
+    if($('zoneEta').textContent !== (eta ? 'tiba ±' + eta : '')) $('zoneEta').textContent = eta ? 'tiba ±' + eta : '';
     if(pdSub) setSubNav(pdSub);
     else if(lastPos){
       const b = {lat0: LAT0, lat1: LAT1, lon0: LON0, lon1: LON1};
@@ -1875,15 +1985,14 @@ function renderPosisi(paksa){
       : '<div class="stat cp"><span>Disisir</span><b>' + teksKotak(n, N) + '</b></div>';
     const bisaPandu = typeof pdTersedia === 'function' && pdTersedia() && !zonaAktif.manual;
     const sh = (typeof PD !== 'undefined' && PD.aktif)
-      ? '<i class="grab"></i>' + pdKartuHtml() +
-        '<div class="bar-actions"><button class="btn gh" style="flex:1" onclick="pdBerhenti()">Berhenti pandu</button><button class="btn gh" style="flex:1;white-space:nowrap" onclick="navigasiAktif()">' + ico('nav') + 'Google Maps</button></div>' +
+      ? '<i class="grab"></i>' +
+        '<button class="btn or" onclick="pdBerhenti()">' + ico('close', 'stroke-width:2.4') + 'Berhenti</button>' +
         '<button class="btn gh sm" onclick="bukaWizard()">' + ico('plus') + 'Catat temuan di sini</button>'
       : '<i class="grab"></i>' + stat + (z ? kartuPrediksiHtml(z) : '') +
         '<div class="banner warn cp" style="justify-content:flex-start">' + ico('info', 'width:16px;height:16px;color:var(--orange-ink)') + '<span>Kotak sisir muncul saat masuk zona</span></div>' +
-        (bisaPandu ? '<button class="btn or" onclick="pdMulai()">' + ico('nav') + 'Pandu ke petak</button>' +
-          '<div class="bar-actions"><button class="btn gh sm" style="flex:1;white-space:nowrap" onclick="navigasiAktif()">Buka Google Maps</button><button class="btn gh sm" style="flex:1;white-space:nowrap" onclick="bukaWizard()">' + ico('plus') + 'Catat temuan</button></div>'
-        : '<button class="btn or" onclick="navigasiAktif()">' + ico('nav') + 'Arahkan dengan Google Maps</button>' +
-          '<button class="btn gh sm" onclick="bukaWizard()">' + ico('plus') + 'Catat temuan di sini</button>');
+        (bisaPandu ? '<button class="btn or" onclick="pdMulai()">' + ico('nav') + 'Gass ke petak</button>'
+        : '<button class="btn or" onclick="navigasiAktif()">' + ico('nav') + 'Arahkan (Google Maps)</button>') +
+        '<button class="btn gh sm" onclick="bukaWizard()">' + ico('plus') + 'Catat temuan</button>';
     if(zs.dataset.sig !== sh){ zs.innerHTML = sh; zs.dataset.sig = sh; }
   }
 }
@@ -2226,7 +2335,7 @@ async function wizSimpan(){
   if(!W || W.simpan) return;
   const pt = petakUntukTemuan();
   if(W.status === 'lanjut_noo' && !posTemuan()){
-    if(!confirm('Lokasi GPS belum didapat. Temuan ini TIDAK dihitung sebagai NOO sah (NOO butuh foto dan GPS). Tetap simpan?')) return;
+    if(!(await dialogSL({ikon: 'gps', judul: 'GPS belum didapat', teks: 'Temuan ini TIDAK dihitung sebagai NOO sah (NOO butuh foto dan GPS). Tunggu sebentar di lokasi supaya GPS dapat, atau tetap simpan sekarang.', ok: 'Tetap simpan', batal: 'Tunggu GPS'}))) return;
   }
   W.simpan = true; renderWiz();
   try{
@@ -2333,6 +2442,7 @@ window.onNativeEvent = function(n){
   }
 };
 window.onBackNative = function(){
+  if(dialogSL.buka){ dialogSL.buka(); return true; }
   if($('apiNoo')){ $('apiNoo').click(); return true; }
   if($('petSheet') && $('petSheet').classList.contains('show')){ petTutup(); return true; }
   if($('modalKatalog').style.display === 'flex'){ tutupKatalog(); return true; }
@@ -2353,6 +2463,9 @@ async function startApp(){
   await hitungOutbox();
   if(sesi && sesi.kode){
     depotAktif = sesi.depot;
+    if(/^(AEPDA|GLKDA)\b/i.test(String(sesi.nama || '').trim())){ try{ nat().berhenti(); }catch(e){} sesi = null; lsDel('sl2_sesi'); toast('SkyLens 2.0 khusus sales GDKDA. Silakan pilih nama lagi.', 4500); }
+  }
+  if(sesi && sesi.kode){
     // validasi diam-diam: kalau kode sudah tidak aktif di server, paksa keluar
     try{ const j = await rpc('sales_login', {p_kode: sesi.kode}); if(j && !j.ok){ sesi = null; lsDel('sl2_sesi'); toast(j.error || 'Sesi tidak valid', 4000); } }catch(e){}
   }

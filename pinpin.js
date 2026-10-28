@@ -124,9 +124,42 @@
   var CEK = '<svg viewBox="0 0 24 24" style="width:14px;height:14px" aria-hidden="true"><path d="m5 12 4.5 4.5L19 7" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   var GEMBOK = '<svg viewBox="0 0 24 24" style="width:13px;height:13px" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
 
+  /* 10 variasi joget & 10 variasi nangis: tiap ketuk ganti kalimat + gerakan, setelah ke-10 kembali ke awal.
+     [emosi dasar SKYPET, kelas gerak badan (index.html .gv-*)] */
+  var VAR_JOGET = [[E.joget, ''], [2, 'gv-goyang'], [1, 'gv-putar'], [E.joget, 'gv-loncat'], [3, 'gv-shimmy'], [4, 'gv-pompa'], [E.joget, 'gv-twist'], [2, 'gv-moonwalk'], [1, 'gv-angguk'], [E.joget, 'gv-salto']];
+  var VAR_NANGIS = [[E.nangis, ''], [E.nangis, 'gv-sesenggukan'], [E.nangis, 'gv-gemetar'], [E.nangis, 'gv-lemes'], [E.nangis, 'gv-ayun'], [E.nangis, 'gv-meraung'], [E.nangis, 'gv-gubrak'], [E.nangis, 'gv-cegukan'], [E.nangis, 'gv-muter'], [E.nangis, 'gv-ngambek']];
+  function kataJoget(i, n, T){
+    return ['Yeay ' + n + ' NOO masuk! Joget dulu ah!',
+      'Asik asik joss! ' + n + ' NOO hari ini, goyang kiri goyang kanan!',
+      'Muter dulu biar makin hoki! NOO berikutnya pasti ketemu.',
+      'Lompat-lompat kegirangan! Kamu keren banget hari ini!',
+      n >= T ? 'Target ' + T + ' NOO tembus! Goyang terus sampai sore!' : 'Goyang dikit! Kurang ' + (T - n) + ' NOO lagi menuju target.',
+      'Dada busung! Bangga punya partner lapangan kayak kamu.',
+      'Twist ala Pinpin! Toko pipa makin banyak, toko sedotan minggir dulu.',
+      'Moonwalk dulu... Pinpin mah gaya. Kamu juga gaya, ' + n + ' NOO!',
+      'Angguk-angguk tanda setuju: kamu jagoan lapangan!',
+      'Salto kemenangan! Streak tetap nyala, gas terus!'][i];
+  }
+  function kataNangis(i, rk){
+    var putus = rk.streak > 0 && !rk.streak_nyala;
+    return ['Huaaa... belum ada NOO. Ayo cari satu aja dulu, aku temenin!',
+      'Hiks... hiks... satu NOO aja udah bikin Pinpin senyum lagi kok.',
+      'Brrr... dingin rasanya tanpa NOO. Hangatin Pinpin dong!',
+      'Pinpin lemes... yuk susuri petak merah yang paling dekat.',
+      putus ? 'Streak ' + rk.streak + ' hari bisa putus... jangan sampai ya, huaa!' : 'Kok sepi ya... ayo kita ramein dengan NOO pertama!',
+      'Huwaaa! Kenapa langit mendung? Oh, belum ada NOO. Yuk gass!',
+      'Gubrak! Pinpin jatuh saking sedihnya. Bangunin pakai 1 NOO ya.',
+      'Hik! Nangis sampai cegukan... toko RT-L di jalan besar nungguin kamu loh.',
+      'Muter-muter nyari NOO tapi belum ketemu... kita cari bareng ya!',
+      'Hentak-hentak kaki! Pokoknya hari ini harus ada NOO, setuju?'][i];
+  }
+  var KEY_VAR = 'sl2_pinpin_var', idxVar = {j: 0, n: 0}, varAktif = null;
+  try{ var _v = JSON.parse(localStorage.getItem(KEY_VAR) || 'null'); if(_v && isFinite(_v.j) && isFinite(_v.n)) idxVar = {j: _v.j % 10, n: _v.n % 10}; }catch(e){}
+
   function renderBesar(boing){
     var rk = ringkas(), h = senang(rk), m = mood(rk), n = rk.hari_ini.noo;
-    hopper.innerHTML = M.svg('pinpin', m);
+    var gv = (reaksi != null && varAktif) ? varAktif : null;
+    hopper.innerHTML = gv ? '<div class="gv ' + gv.kelas + '">' + M.svg('pinpin', gv.emo) + '</div>' : M.svg('pinpin', m);
     if(boing){ hopper.classList.remove('boing'); void hopper.offsetWidth; hopper.classList.add('boing'); }
     var baris = {};
     baris[E.sedih] = rk.streak > 0 && !rk.streak_nyala
@@ -135,14 +168,14 @@
     baris[E.senang] = 'Mantap! ' + n + ' NOO hari ini. Streak aman, lanjut kejar target ya!';
     baris[E.nangis] = 'Huaaa... belum ada NOO. Ayo cari satu aja dulu, aku temenin!';
     baris[E.joget] = 'Yeay ' + n + ' NOO masuk! Joget dulu ah!';
-    document.getElementById('pSay').textContent = baris[m] || '';
+    document.getElementById('pSay').textContent = gv ? gv.kata : (baris[m] || '');
     document.getElementById('bigHit').setAttribute('aria-label', h ? 'Pinpin senang. Ketuk biar dia joget' : 'Pinpin sedih. Ketuk dan dia nangis');
   }
 
   function renderPanel(){
     var rk = ringkas(), h = senang(rk), mm;
     try{ mm = hitungMisi(); }catch(e){ mm = {misi: [], selesai: 0}; }
-    var T = (typeof TARGET_NOO_HARIAN === 'number') ? TARGET_NOO_HARIAN : 3, n = rk.hari_ini.noo;
+    var T = (typeof window.targetNooHarian === 'function') ? window.targetNooHarian() : ((typeof TARGET_NOO_HARIAN === 'number') ? TARGET_NOO_HARIAN : 3), n = rk.hari_ini.noo;
     var nama = (typeof sesi !== 'undefined' && sesi && typeof namaDepan === 'function') ? namaDepan(sesi.nama) : '';
     document.getElementById('petWho').textContent = 'SkyLens 2.0';
     document.getElementById('pStreak').textContent = rk.streak;
@@ -203,7 +236,15 @@
   document.getElementById('bigHit').addEventListener('click', function(){
     if(Date.now() - bukaAt < 500) return;
     clearTimeout(reaksiTimer);
-    reaksi = senang() ? E.joget : E.nangis;
+    var rk = ringkas(), T = (typeof window.targetNooHarian === 'function') ? window.targetNooHarian() : 3;
+    if(senang(rk)){
+      var i = idxVar.j; idxVar.j = (i + 1) % 10;
+      varAktif = {emo: VAR_JOGET[i][0], kelas: VAR_JOGET[i][1], kata: kataJoget(i, rk.hari_ini.noo, T)}; reaksi = E.joget;
+    } else {
+      var k = idxVar.n; idxVar.n = (k + 1) % 10;
+      varAktif = {emo: VAR_NANGIS[k][0], kelas: VAR_NANGIS[k][1], kata: kataNangis(k, rk)}; reaksi = E.nangis;
+    }
+    try{ localStorage.setItem(KEY_VAR, JSON.stringify(idxVar)); }catch(e){}
     renderBesar(true);
     reaksiTimer = setTimeout(function(){ reaksi = null; renderBesar(true); }, 3600);
   });
@@ -337,7 +378,7 @@
     moodTerakhir = null; renderPet();
     try{ apiBerapi(rk); }catch(e){}
     if(panelBuka()){
-      clearTimeout(reaksiTimer); reaksi = E.joget; renderPanel(); renderBesar(true); konfeti();
+      clearTimeout(reaksiTimer); reaksi = E.joget; varAktif = null; renderPanel(); renderBesar(true); konfeti();
       reaksiTimer = setTimeout(function(){ reaksi = null; renderBesar(true); }, 3600);
       return;
     }

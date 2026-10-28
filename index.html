@@ -383,6 +383,81 @@ svg .seg{transform-box:view-box;transform-origin:0 0}
 .lbMati .lbPetak{display:none}
 .jksChip{display:inline-block;align-self:flex-start;margin-top:3px;padding:2px 8px;border-radius:999px;background:#FFF1E6;color:#B84A00;font-size:11.5px;font-weight:800}
 .mgrsel{width:100%;padding:10px 12px;border:1px solid rgba(120,130,150,.35);border-radius:10px;font-size:15px;font-weight:600;color:var(--ink);background:transparent;margin-bottom:4px}
+
+/* dialog bermerek (pengganti confirm/prompt) */
+.dlg-ov{position:absolute;inset:0;z-index:5000;background:rgba(15,23,42,0);display:flex;align-items:center;justify-content:center;padding:24px;transition:background .16s}
+.dlg-ov.on{background:rgba(15,23,42,.52)}
+.dlg{width:100%;max-width:360px;background:#fff;border-radius:24px;padding:24px 20px 18px;box-shadow:0 24px 60px rgba(15,23,42,.3);display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;transform:translateY(14px) scale(.97);opacity:0;transition:transform .18s cubic-bezier(.2,.9,.3,1.2),opacity .16s}
+.dlg-ov.on .dlg{transform:none;opacity:1}
+.dlg-ik{width:56px;height:56px;border-radius:18px;display:flex;align-items:center;justify-content:center;margin-bottom:4px;background:var(--orange-soft);color:var(--orange-ink)}
+.dlg-ik .ico{width:28px;height:28px;stroke-width:2}
+.dlg.navy .dlg-ik{background:var(--navy-tint);color:var(--navy)}
+.dlg.merah .dlg-ik{background:#FBE3DF;color:#A32A1C}
+.dlg h3{font-size:19px;font-weight:800;letter-spacing:-.01em;color:var(--ink)}
+.dlg-t{font-size:14px;color:var(--muted);line-height:1.5}
+.dlg-in{position:relative;width:100%;margin-top:8px}
+.dlg-in input{width:100%;height:54px;border:1.5px solid var(--line);border-radius:16px;padding:0 52px 0 16px;font-size:18px;font-weight:700;letter-spacing:.18em;background:var(--ground);color:var(--ink);outline:none;text-align:center}
+.dlg-in input::placeholder{letter-spacing:0;font-weight:500;color:#9AA2B2;font-size:15px}
+.dlg-in input:focus{border-color:var(--navy);background:#fff;box-shadow:0 0 0 4px var(--navy-tint)}
+.dlg-eye{position:absolute;right:6px;top:7px;width:40px;height:40px;border:0;border-radius:12px;background:transparent;color:var(--muted);display:flex;align-items:center;justify-content:center}
+.dlg-err{min-height:18px;font-size:13px;font-weight:700;color:#B42318;margin-top:2px}
+.dlg-act{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;margin-top:10px}
+.dlg-act .btn{min-height:50px}
+.dlg-ok{background:var(--orange);color:var(--ink)}
+.dlg.navy .dlg-ok{background:var(--navy);color:#fff}
+.dlg.merah .dlg-ok{background:#C62828;color:#fff}
+.dlg.goyang{animation:dlgGoyang .36s}
+@keyframes dlgGoyang{20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+.dlg-av{width:64px;height:64px;border-radius:50%;background:var(--navy);color:#fff;font-weight:800;font-size:22px;display:flex;align-items:center;justify-content:center;margin-bottom:4px;box-shadow:0 0 0 6px var(--navy-tint)}
+.dlg-who{display:flex;flex-direction:column;gap:2px;margin:-2px 0 6px}
+.dlg-who b{font-size:16px;font-weight:800}
+.dlg-who span{font-size:12.5px;color:var(--muted);font-family:var(--mono)}
+.dlg-li{list-style:none;margin:4px 0 0;padding:0;width:100%;display:flex;flex-direction:column;gap:8px;text-align:left}
+.dlg-li li{display:flex;gap:10px;align-items:flex-start;font-size:13.5px;line-height:1.45;color:var(--ink);background:var(--ground);border-radius:14px;padding:11px 12px}
+.dlg-li li .ico{width:18px;height:18px;margin-top:1px;color:var(--navy)}
+.dlg-li li.warn{background:var(--orange-soft);color:var(--orange-deep)}
+.dlg-li li.warn .ico{color:var(--orange-ink)}
+
+/* Pinpin: 10 variasi gerak joget & nangis (dibungkus .gv di atas animasi tangan/ekspresi SKYPET) */
+.gv{width:100%;height:100%;transform-origin:50% 92%}
+.gv svg{width:100%;height:100%;overflow:visible;display:block}
+.gv-goyang{animation:gvGoyang .8s ease-in-out infinite}
+@keyframes gvGoyang{0%,100%{transform:translateX(-14px) rotate(-6deg)}50%{transform:translateX(14px) rotate(6deg)}}
+.gv-putar{animation:gvPutar 1.3s cubic-bezier(.5,0,.4,1) infinite}
+@keyframes gvPutar{0%{transform:rotate(0)}60%,100%{transform:rotate(360deg)}}
+.gv-loncat{animation:gvLoncat .9s ease-in-out infinite}
+@keyframes gvLoncat{0%,100%{transform:translate(-18px,0) scale(1.04,.96)}25%{transform:translate(0,-26px) scale(.96,1.05)}50%{transform:translate(18px,0) scale(1.04,.96)}75%{transform:translate(0,-26px) scale(.96,1.05)}}
+.gv-shimmy{animation:gvShimmy .22s linear infinite}
+@keyframes gvShimmy{0%,100%{transform:skewX(-6deg) translateX(-3px)}50%{transform:skewX(6deg) translateX(3px)}}
+.gv-pompa{animation:gvPompa .6s ease-in-out infinite}
+@keyframes gvPompa{0%,100%{transform:scale(1)}40%{transform:scale(1.12) translateY(-6px)}70%{transform:scale(.97)}}
+.gv-twist{animation:gvTwist 1s ease-in-out infinite}
+@keyframes gvTwist{0%,100%{transform:perspective(500px) rotateY(-35deg)}50%{transform:perspective(500px) rotateY(35deg) translateY(-8px)}}
+.gv-moonwalk{animation:gvMoon 1.8s ease-in-out infinite}
+@keyframes gvMoon{0%,100%{transform:translateX(22px) rotate(-4deg)}50%{transform:translateX(-22px) rotate(-4deg)}52%{transform:translateX(-22px) scaleX(-1) rotate(4deg)}98%{transform:translateX(22px) scaleX(-1) rotate(4deg)}}
+.gv-angguk{animation:gvAngguk .45s ease-in-out infinite}
+@keyframes gvAngguk{0%,100%{transform:rotate(0)}50%{transform:rotate(12deg) translateY(4px)}}
+.gv-salto{animation:gvSalto 1.6s ease-in-out infinite}
+@keyframes gvSalto{0%,15%{transform:translateY(0)}45%{transform:translateY(-40px) rotate(180deg)}75%{transform:translateY(0) rotate(360deg) scale(1.06,.94)}100%{transform:rotate(360deg)}}
+.gv-sesenggukan{animation:gvSeseng .7s ease-in-out infinite}
+@keyframes gvSeseng{0%,60%,100%{transform:translateY(0) scale(1)}70%{transform:translateY(-8px) scale(.97,1.04)}80%{transform:translateY(0) scale(1.03,.97)}90%{transform:translateY(-5px)}}
+.gv-gemetar{animation:gvGemetar .09s linear infinite}
+@keyframes gvGemetar{0%,100%{transform:translateX(-2.5px)}50%{transform:translateX(2.5px)}}
+.gv-lemes{animation:gvLemes 2.4s ease-in-out infinite}
+@keyframes gvLemes{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(14px) scale(1.08,.86)}}
+.gv-ayun{animation:gvAyun 1.6s ease-in-out infinite}
+@keyframes gvAyun{0%,100%{transform:rotate(-12deg)}50%{transform:rotate(12deg)}}
+.gv-meraung{animation:gvMeraung 1.2s ease-in-out infinite}
+@keyframes gvMeraung{0%,100%{transform:rotate(0) scale(1)}40%,60%{transform:rotate(-14deg) translateY(-6px) scale(1.04)}}
+.gv-gubrak{animation:gvGubrak 2.2s ease-in-out infinite}
+@keyframes gvGubrak{0%,10%{transform:rotate(0)}30%,65%{transform:rotate(-82deg) translateY(10px)}80%{transform:rotate(8deg)}100%{transform:rotate(0)}}
+.gv-cegukan{animation:gvCeguk 1.4s ease-out infinite}
+@keyframes gvCeguk{0%,30%,55%,100%{transform:translateY(0)}38%{transform:translateY(-18px) scale(.95,1.06)}63%{transform:translateY(-12px) scale(.97,1.04)}}
+.gv-muter{animation:gvMuter 2.6s ease-in-out infinite}
+@keyframes gvMuter{0%{transform:rotate(0) translateX(0)}25%{transform:rotate(-20deg) translateX(-12px)}50%{transform:rotate(0) translateX(0)}75%{transform:rotate(20deg) translateX(12px)}100%{transform:rotate(0)}}
+.gv-ngambek{animation:gvNgambek .5s ease-in infinite}
+@keyframes gvNgambek{0%,100%{transform:translateY(0) scale(1.06,.92)}45%{transform:translateY(-16px) scale(.96,1.05)}}
+@media (prefers-reduced-motion:reduce){.gv{animation:none!important}}
 </style>
 <style id="patch20251025">
 /* ikon pin di judul */
@@ -486,6 +561,10 @@ svg .seg{transform-box:view-box;transform-origin:0 0}
 .navtop .ntxt b{font-size:16px;line-height:1.15;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .navtop .nsub,.navtop .naddr{font-size:12.5px;line-height:1.2;color:#C9D0DE;font-weight:600;display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .navtop .naddr{display:none}
+.navtop .nrow{display:flex;align-items:center;gap:8px;min-width:0}
+.navtop .nrow b{min-width:0}
+.navtop .neta{flex:none;font-size:12px;font-weight:800;color:#FFB27A;background:rgba(254,122,27,.16);border:1px solid rgba(254,122,27,.35);border-radius:999px;padding:3px 9px;white-space:nowrap;font-family:var(--mono)}
+.navtop .neta:empty{display:none}
 .navtop.open .nsub{display:none}
 .navtop.open .naddr{display:block}
 .nsub .narr{width:15px;height:15px;flex:none;transition:transform .4s}
@@ -603,7 +682,7 @@ svg .seg{transform-box:view-box;transform-origin:0 0}
     <!-- kartu navigasi tunggal (navy): judul area + status jarak/GPS; ketuk = alamat -->
     <div class="topcard navtop" id="topcardNav">
       <button class="ibtn" onclick="kembaliKeDaftar()" aria-label="Kembali"><svg class="ico" viewBox="0 0 24 24"><path d="M15 5 8 12l7 7"/></svg></button>
-      <div class="ntxt" id="navTxt" onclick="tapKartuNav()" role="button" tabindex="0" aria-label="Info zona"><b id="zoneTitle">—</b><span id="zoneSub" class="nsub"><i class="gdot"></i>Mencari lokasi GPS…</span><span id="zoneAddr" class="naddr"></span></div>
+      <div class="ntxt" id="navTxt" onclick="tapKartuNav()" role="button" tabindex="0" aria-label="Info zona"><span class="nrow"><b id="zoneTitle">—</b><span id="zoneEta" class="neta"></span></span><span id="zoneSub" class="nsub"><i class="gdot"></i>Mencari lokasi GPS…</span><span id="zoneAddr" class="naddr"></span></div>
       <button class="ibtn" id="searchToggleBtn" onclick="toggleSearchToko()" aria-label="Cek toko"><svg class="ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
     </div>
     <div class="navcard" id="navcard"></div>

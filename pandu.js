@@ -195,12 +195,12 @@ function pdHitung(){
 }
 function pdMulai(){
   if(!zonaAktif) return;
-  if(!pdTersedia()){ toast('Data jalan depo belum termuat. Pakai Google Maps dulu ya.', 3600); return; }
+  if(!pdTersedia()){ toast('Data jalan depo belum termuat. Coba sebentar lagi ya.', 3600); return; }
   PD.aktif = true; PD.tujuanKey = zonaAktif.key_petak; PD.sampaiT = 0;
   pdMulaiGpsCadangan();
   if(!pdPos()){ toast('Menunggu sinyal GPS… rute muncul begitu lokasi didapat', 3600); }
-  else if(!pdHitung()){ toast('Jalan ke petak ini belum terpeta lengkap. Ikuti panah arah atau pakai Google Maps.', 4200); }
-  followMode = true; $('recenterBtn').style.display = 'none';
+  else if(!pdHitung()){ toast('Jalan ke petak ini belum terpeta lengkap. Ikuti panah arah di atas ya.', 4200); }
+  followMode = true; utaraKunci = false; tampilRecenter();
   try{ const pos = pdPos(); if(pos && map) map.setView([pos.lat, pos.lon], Math.max(map.getZoom(), 17)); }catch(e){}
   $('zoneSheet').dataset.sig = ''; renderPosisi(true);
 }
@@ -270,6 +270,28 @@ function pdLangkah(){
 function pdNavSub(){
   const l = pdLangkah(); if(!l) return null;
   return pdIkon(l.ikon) + '<span style="overflow:hidden;text-overflow:ellipsis">' + esc(l.teks) + '</span>';
+}
+/* titik di rute pada jarak m (meter dari awal rute) */
+function pdTitikPada(m){
+  const P = PD.rute.titik, C = PD.cum;
+  let j = Math.max(0, Math.min(PD.iSeg, P.length - 2));
+  while(j < P.length - 2 && C[j + 1] < m) j++;
+  while(j > 0 && C[j] > m) j--;
+  const a = P[j], b = P[j + 1], L = C[j + 1] - C[j], t = L > 0 ? Math.max(0, Math.min(1, (m - C[j]) / L)) : 1;
+  return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+}
+/* arah jalan di depan (untuk peta berputar mengikuti rute): dari posisi di rute ke ±30 m di depan */
+function pdArahDepan(){
+  if(!PD.aktif || !PD.rute || PD.rute.titik.length < 2) return null;
+  const a = pdTitikPada(PD.prog), b = pdTitikPada(Math.min(PD.tot, PD.prog + 30));
+  if(haversine(a[0], a[1], b[0], b[1]) < 4) return null;
+  return bearing(a[0], a[1], b[0], b[1]);
+}
+/* perkiraan jam tiba (naik motor) — ditampilkan di kanan judul petak */
+function pdTiba(){
+  const l = pdLangkah(); if(!l || l.sisa == null) return '';
+  const mnt = Math.max(1, Math.round(l.sisa / (KECEPATAN_MOTOR_KMH * 1000 / 60)));
+  return new Date(Date.now() + mnt * 60000).toLocaleTimeString('id-ID', {hour: '2-digit', minute: '2-digit'});
 }
 function pdKartuHtml(){
   const l = pdLangkah(); if(!l) return '';
