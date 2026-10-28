@@ -144,7 +144,7 @@
     var putus = rk.streak > 0 && !rk.streak_nyala;
     return ['Huaaa... belum ada NOO. Ayo cari satu aja dulu, aku temenin!',
       'Hiks... hiks... satu NOO aja udah bikin Pinpin senyum lagi kok.',
-      'Brrr... dingin rasanya tanpa NOO. Hangatin Pinpin dong!',
+      'Pinpin sampai gemetar nungguin NOO pertama hari ini. Yuk mulai satu dulu!',
       'Pinpin lemes... yuk susuri petak merah yang paling dekat.',
       putus ? 'Streak ' + rk.streak + ' hari bisa putus... jangan sampai ya, huaa!' : 'Kok sepi ya... ayo kita ramein dengan NOO pertama!',
       'Huwaaa! Kenapa langit mendung? Oh, belum ada NOO. Yuk gass!',

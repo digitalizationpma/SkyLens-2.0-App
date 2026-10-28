@@ -647,7 +647,7 @@ function targetHarian(){
     const g = jksHariD(); if(g.getDay() === 0) return bawaan;
     const k = tglKunci(g) + '|' + (OUTLET ? OUTLET.length : 0) + '|' + (zonaList ? zonaList.length : 0) + '|' + sesi.kode;
     if(targetHarian.k === k && targetHarian.v) return targetHarian.v;
-    const jh = jksHariIni(g); if(!jh) return bawaan;
+    const jh = jksHariIni(g); if(!jh || !jh.jumlah_toko) return bawaan;   // hari ini tidak ada toko JKS di depo ini -> target bawaan
     const S = Math.min((jh.toko_sedotan || []).length, 10);
     const jp = jksPetakSegar() || {};
     const searah = (zonaList || []).filter(z => jp[keyDari(z[2], z[3])] && zonaTampil(z));
@@ -665,6 +665,7 @@ function misiGanti(){
     if(g.getDay() === 0) return {id: 'ganti', kunci: true, pendek: 'Ganti toko sedotan dengan RT-L', tag: 'Libur', teks: 'Hari Minggu tidak ada JKS. Selamat istirahat, besok misi ini aktif lagi!'};
     const jh = jksHariIni(g);
     if(!jh) return {id: 'ganti', kunci: true, pendek: 'Ganti toko sedotan dengan RT-L', tag: 'JKS belum ada', teks: 'JKS kamu belum ada di data depo ini, jadi daftar toko sedotan belum bisa ditampilkan. Tetap cari RT-L di sekitarmu ya!'};
+    if(!jh.jumlah_toko) return {id: 'ganti', kunci: true, pendek: 'JKS hari ini tidak ada toko di area ini', tag: 'Info', teks: 'JKS kamu hari ini (' + esc(jh.kode_jks) + ') tidak punya toko di area ' + esc(sesi.depot) + ', jadi belum ada toko sedotan yang perlu diganti. Tetap cari toko RT-L baru di petak tugasmu ya!'};
     const sed = jh.toko_sedotan || [], th = targetHarian(), P = th.P, nP = th.nP;
     const w = wibDate(), mulai = Date.UTC(w.getUTCFullYear(), w.getUTCMonth(), w.getUTCDate()) - 7 * 3600e3;
     const ada = temuanGabungan().filter(x => x.uk === 'RT-L' && x.st !== 'sudah_dicover' && x.t >= mulai).length;
@@ -1059,7 +1060,7 @@ function zonaCardHtml(z, idx, no){
   return '<button type="button" class="card zonecard' + (here ? ' here' : '') + (jk ? ' jksHari' : '') + '" onclick="bukaZonaIdx(' + idx + ')">' +
     (jk ? '<span class="jksPita">Searah JKS hari ini<em>' + jk + ' toko</em></span>' : '') +
     '<span class="row" style="justify-content:space-between;align-items:flex-start;width:100%;gap:10px"><span class="zNo">' + no + '</span><span class="col" style="gap:2px;flex:1;min-width:0"><b style="font-size:16px">' + esc(z[11] || ('Petak ' + key)) + '</b>' +
-    '<span class="muted" style="font-size:13px">' + esc(kecZona(z)) + (jarak ? ' · ' + jarak : '') + '</span></span><span class="prio p' + (pr === '-' ? 'X' : pr) + '">Prioritas ' + pr + '</span></span>' +
+    '<span class="muted" style="font-size:13px">' + esc(kecZona(z)) + (jarak && !here ? ' · ' + jarak : '') + '</span>' + (here ? '<span class="hereTag"><i></i>Kamu sedang di petak ini</span>' : '') + '</span><span class="prio p' + (pr === '-' ? 'X' : pr) + '">Prioritas ' + pr + '</span></span>' +
     '<span class="row" style="width:100%;gap:10px">' + segKotakHtml(n, N) + '<span class="mono" style="font-size:13px;white-space:nowrap">' + teksKotak(n, N) + '</span></span></button>';
 }
 /* ---- bilah RBM/BM/ASS: pilih depo + filter sales ---- */
@@ -1182,6 +1183,13 @@ async function bukaDetailTemuan(id){
     if(RD && RD.id === String(id)){ RD.muat = false; if(screenAktif === 'scrTemuan' && !W) renderDetailTemuan(); }
   }
 }
+/* foto layar penuh (ketuk lagi / tombol kembali untuk menutup) */
+function fotoPenuh(src){
+  const w = document.createElement('div'); w.id = 'fotoPenuhOv'; w.className = 'fotoPenuh';
+  w.innerHTML = '<img src="' + esc(src) + '" alt="Foto toko"><button type="button" class="ibtn" aria-label="Tutup">' + ico('close') + '</button>';
+  w.onclick = () => w.remove();
+  document.getElementById('app').appendChild(w);
+}
 function tutupDetailTemuan(){ rdLepasFoto(); RD = null; tampil('scrMain'); bukaTab('riwayat'); }
 function renderDetailTemuan(){
   if(!RD) return;
@@ -1204,7 +1212,7 @@ function renderDetailTemuan(){
       ? '<div class="banner ok" style="justify-content:flex-start">' + ico('check', 'width:18px;height:18px') + '<span>NOO sah: ada foto dan lokasi GPS.</span></div>'
       : '<div class="banner warn" style="justify-content:flex-start">' + ico('info', 'width:18px;height:18px') + '<span>Belum dihitung NOO sah: ' + (!okGps ? 'lokasi GPS tidak tercatat saat disimpan' : 'foto belum ada') + '.</span></div>';
   }
-  const foto = RD.fotoUrl ? '<div class="photo has"><img src="' + esc(RD.fotoUrl) + '" alt="Foto toko"></div>'
+  const foto = RD.fotoUrl ? '<button type="button" class="photo has det" onclick="fotoPenuh(this.querySelector(\'img\').src)" aria-label="Perbesar foto toko"><img src="' + esc(RD.fotoUrl) + '" alt="Foto toko"><span class="zoomTip">' + ico('search', 'width:14px;height:14px') + 'Ketuk untuk perbesar</span></button>'
     : (RD.muat ? '<div class="photo" style="pointer-events:none"><span class="muted" style="font-size:13px">Memuat foto…</span></div>' : (st === 'sudah_dicover' ? '' : '<div class="photo" style="pointer-events:none"><span class="muted" style="font-size:13px">Foto tidak tersedia di HP ini' + (t.kirim ? '' : ' (menunggu terkirim)') + '</span></div>'));
   const h = '<div class="wizhead"><div class="row"><button type="button" class="ibtn" onclick="tutupDetailTemuan()" aria-label="Kembali">' + ico('back') + '</button>' +
     '<div class="col" style="flex:1;min-width:0;gap:2px"><b style="font-size:17px">Detail temuan</b><span class="muted" style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(nama) + '</span></div></div></div>' +
@@ -2442,6 +2450,7 @@ window.onNativeEvent = function(n){
   }
 };
 window.onBackNative = function(){
+  if($('fotoPenuhOv')){ $('fotoPenuhOv').remove(); return true; }
   if(dialogSL.buka){ dialogSL.buka(); return true; }
   if($('apiNoo')){ $('apiNoo').click(); return true; }
   if($('petSheet') && $('petSheet').classList.contains('show')){ petTutup(); return true; }
@@ -2454,9 +2463,9 @@ window.onBackNative = function(){
   if(screenAktif === 'scrMain' && tabAktif !== 'beranda'){ bukaTab('beranda'); return true; }
   return false;   // layar paling depan: app cuma disembunyikan (perekaman tetap jalan)
 };
-document.addEventListener('visibilitychange', () => { if(!document.hidden){ pollFix(); if(sesi){ prosesOutbox(); muatRingkasan(false); } segarkanLayarAktif(); } });
+document.addEventListener('visibilitychange', () => { if(!document.hidden){ pollFix(); if(sesi){ prosesOutbox(); muatRingkasan(false); if(typeof jlSinkronServer === 'function') jlSinkronServer(false); } segarkanLayarAktif(); } });
 window.addEventListener('online', () => { if(sesi){ prosesOutbox(); muatRingkasan(false); } });
-setInterval(() => { if(sesi && !document.hidden) prosesOutbox(); }, 30000);
+setInterval(() => { if(sesi && !document.hidden){ prosesOutbox(); if(typeof jlSinkronServer === 'function') jlSinkronServer(false); } }, 30000);
 
 async function startApp(){
   tampil('scrDepot');

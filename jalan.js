@@ -2,21 +2,62 @@
    SkyLens 2.0 — JALAN (Pacman) + KOTAK CERDAS   (v1.1.3)
    Data per depo: data/jalan/<DEPO>.json (dibuat dari Overture/OSM + lebar jalan toko OPCI).
    - Kotak 4x4 hanya "aktif" kalau ada permukiman (atap >= atapMin). Kotak hutan/sawah tidak dihitung.
-   - Ruas jalan dipotong-potong ±20 m. Potongan "dimakan" (jadi teal) kalau ada titik GPS dalam 20 m.
+   - Ruas jalan dipotong-potong ±10 m. v1.2.3: potongan "dimakan" (jadi teal) lewat MAP-MATCHING (lihat MM di bawah):
+     jejak disambung tiap 4 m, tiap titik hanya memakan SATU potongan terdekat (≤20 m) yang ARAHNYA searah gerak (≤40°),
+     jadi ujung gang yang dilewati tegak lurus & jalur paralel tidak ikut teal. Akurasi GPS > 25 m dan titik diam tidak dipakai.
+     Sumber titik: GPS langsung di HP + jejak di server (Supabase) supaya sama dengan dashboard.
    - Kotak aktif yang punya jalan (>= 30 m) selesai kalau >= 70% panjang jalannya sudah dimakan.
      Kotak aktif tanpa jalan terpeta tetap pakai aturan lama (jelajah ±1 menit).
    - Kalau file jalan depo tidak ada: semua fungsi diam, app jalan seperti v1.1.2 (16 kotak + 1 menit).
    ============================================================ */
-const JL_POTONG_M = 20;          // panjang satu potongan ruas
-const JL_RADIUS_M = 20;          // titik GPS sejauh ini dari potongan = potongan dilewati
-const JL_AKURASI_MAKS = 35;      // titik dengan akurasi lebih buruk dari ini tidak dipakai untuk "memakan" jalan
+const JL_POTONG_M = 10;          // panjang satu potongan ruas (sama dengan dashboard)
 const JL_KOTAK_MIN_M = 30;       // kotak dianggap punya jalan kalau total potongan di dalamnya >= 30 m
 const JL_KOTAK_SELESAI = 0.7;    // 70% panjang jalan di kotak dilewati = kotak selesai
 const JL_BESAR_SELESAI = 0.7;    // nama jalan besar diberi centang kalau 70% dilewati
 const JL_WARNA = {B: '#1F2C4F', Q: '#1F2C4F', M: '#3B82F6', T: '#FE7A1B', makan: '#00BFA5'};
 const JL_BUCKET = 0.0004;        // ukuran sel indeks spasial (±44 m)
 
-const JL = {data: null, depo: '', rp: {}, hash: null, done: new Set(), ver: 0, simpanT: null, legOpen: false};
+const JL = {data: null, depo: '', rp: {}, hash: null, done: new Set(), ver: 0, simpanT: null, legOpen: false, mmLive: null, mmSrv: null, sinkT: 0};
+
+/* ===== MM: map-matching jejak -> potongan jalan. KODE INI SAMA PERSIS DENGAN DASHBOARD (template9.html, mmProses). =====
+   A = adaptor: cari(lat, lon, R) -> [[jarak_m, potongan], ...], ang(p) arah potongan 0-180°, ri(p) id ruas, seq(p) urutan di ruas,
+   tandai(p), tandaiSeq(ri, seq). t dalam detik. */
+var MM_R = 20, MM_ANG = 40, MM_AKUR = 25, MM_STEP = 4, MM_HYST = 5, MM_GAP = 4, MM_GERAK = 6, MM_DEKAT = 12, MM_PUTUS_S = 100, MM_PUTUS_M = 250;
+function mmSudut(a, b){ var d = Math.abs(a - b) % 180; return Math.min(d, 180 - d); }
+function mmBaru(){ return {anc: null, lastT: null, hp: null, prev: null}; }
+function mmProses(st, t, lat, lon, acc, A){
+  if(acc != null && acc > MM_AKUR) return;
+  var kx = 111320 * Math.cos(lat * Math.PI / 180), KY = 110574;
+  if(!st.anc || t - st.lastT > MM_PUTUS_S || t < st.lastT || Math.sqrt(Math.pow((lon - st.anc[1]) * kx, 2) + Math.pow((lat - st.anc[0]) * KY, 2)) > MM_PUTUS_M){
+    st.anc = [lat, lon]; st.lastT = t; st.hp = null; st.prev = null; return;
+  }
+  st.lastT = t;
+  var a = st.anc, dx = (lon - a[1]) * kx, dy = (lat - a[0]) * KY, d = Math.sqrt(dx * dx + dy * dy);
+  if(d < MM_GERAK) return;   // diam / goyang GPS: tidak memakan jalan
+  var h = ((Math.atan2(dy, dx) * 180 / Math.PI) % 180 + 180) % 180, n = Math.max(1, Math.ceil(d / MM_STEP));
+  for(var j = 0; j <= n; j++){
+    var sLa = a[0] + (lat - a[0]) * j / n, sLo = a[1] + (lon - a[1]) * j / n, dekat = st.hp != null && j * d / n < MM_DEKAT;
+    var c = A.cari(sLa, sLo, MM_R), best = null, bd = 1e9, list = [], k;
+    for(k = 0; k < c.length; k++){
+      var ag = A.ang(c[k][1]);
+      if(mmSudut(ag, h) <= MM_ANG || (dekat && mmSudut(ag, st.hp) <= MM_ANG)){ list.push(c[k]); if(c[k][0] < bd){ bd = c[k][0]; best = c[k][1]; } }
+    }
+    if(best == null) continue;
+    if(st.prev != null){   // tetap di ruas yang sama kalau masih masuk akal (jalur paralel tidak loncat-loncat)
+      var rp = A.ri(st.prev), bs = null, bsd = 1e9;
+      for(k = 0; k < list.length; k++) if(A.ri(list[k][1]) === rp && list[k][0] <= bd + MM_HYST && list[k][0] < bsd){ bsd = list[k][0]; bs = list[k][1]; }
+      if(bs != null) best = bs;
+    }
+    A.tandai(best);
+    if(st.prev != null && A.ri(st.prev) === A.ri(best)){
+      var s1 = A.seq(st.prev), s2 = A.seq(best);
+      if(Math.abs(s1 - s2) <= MM_GAP) for(var q = Math.min(s1, s2); q <= Math.max(s1, s2); q++) A.tandaiSeq(A.ri(best), q);
+    }
+    st.prev = best;
+  }
+  st.anc = [lat, lon]; st.hp = h;
+}
+/* ===== akhir MM ===== */
 
 /* Data jalan besar (0,6–6,6 MB per depo) TIDAK ikut APK/paket tampilan: diunduh sekali dari GitHub Pages lalu disimpan di cache HP.
    Urutan: cache HP (langsung dipakai) → internet → file bawaan APK (kalau ada). Cache diperbarui diam-diam di belakang. */
@@ -43,7 +84,9 @@ async function jlMuat(dep){
     const d = await jlAmbil(dep.replace(/\s+/g, '_'));
     if(d && d.roads && d.petak) JL.data = d;
   }catch(e){ JL.data = null; }
-  try{ JL.done = new Set(sesi ? lsGet('sl2_jl_' + sesi.kode, []) : []); }catch(e){ JL.done = new Set(); }
+  try{ JL.done = new Set(sesi ? lsGet('sl2_jl2_' + sesi.kode, []) : []); }catch(e){ JL.done = new Set(); }   // jl2 = potongan 10 m + map-matching (data jl lama 20 m tidak dipakai lagi)
+  JL.mmLive = mmBaru(); JL.mmSrv = mmBaru();
+  try{ if(sesi) localStorage.removeItem('sl2_jl_' + sesi.kode); }catch(e){}   // bersihkan data jalan versi lama (20 m)
 }
 function jlAda(){ return !!JL.data; }
 function jlPetak(key){ return JL.data ? (JL.data.petak[String(key)] || null) : null; }
@@ -82,12 +125,13 @@ function jlPotongan(ri){
   for(let k = 0; k + 3 < f.length; k += 2){
     const la1 = f[k]/1e5, lo1 = f[k+1]/1e5, la2 = f[k+2]/1e5, lo2 = f[k+3]/1e5;
     const L = haversine(la1, lo1, la2, lo2); if(L <= 0) continue;
+    const kxr = 111320 * Math.cos(la1 * Math.PI / 180), ang = ((Math.atan2((la2 - la1) * 110574, (lo2 - lo1) * kxr) * 180 / Math.PI) % 180 + 180) % 180;
     const n = Math.max(1, Math.ceil(L / JL_POTONG_M));
     for(let j = 0; j < n; j++){
       const t0 = j/n, t1 = (j+1)/n;
       const a = [la1 + (la2-la1)*t0, lo1 + (lo2-lo1)*t0], b = [la1 + (la2-la1)*t1, lo1 + (lo2-lo1)*t1];
       const m = [(a[0]+b[0])/2, (a[1]+b[1])/2], cl = jlCellDari(m[0], m[1]);
-      out.push({id: ri + '.' + (seq++), ri: ri, a: a, b: b, m: m, len: L/n, kat: rd[0], key: cl.key, cell: cl.i});
+      out.push({id: ri + '.' + (seq++), ri: ri, seq: seq - 1, a: a, b: b, m: m, len: L/n, kat: rd[0], key: cl.key, cell: cl.i, ang: ang});
     }
   }
   JL.rp[ri] = out; return out;
@@ -106,46 +150,84 @@ function jlSiapkanIndeks(){
   JL.hash = null;
   if(!JL.data || !zonaList.length) return;
   const h = new Map(), sudah = new Set();
-  zonaList.forEach(z => jlRuasPetak(keyDari(z[2], z[3])).forEach(ri => {
+  const kunciIdx = new Set();
+  zonaList.forEach(z => { for(let dx = -1; dx <= 1; dx++) for(let dy = -1; dy <= 1; dy++) kunciIdx.add(keyDari(z[2] + dx, z[3] + dy)); });   // + petak tetangga: jalan di tepi petak ikut dibandingkan (sama dengan dashboard)
+  kunciIdx.forEach(kp => jlRuasPetak(kp).forEach(ri => {
     if(sudah.has(ri)) return; sudah.add(ri);
     jlPotongan(ri).forEach(q => {
       const bk = Math.floor(q.m[0] / JL_BUCKET) + ':' + Math.floor(q.m[1] / JL_BUCKET);
       let arr = h.get(bk); if(!arr){ arr = []; h.set(bk, arr); } arr.push(q);
     });
   }));
-  JL.hash = h; JL.prev = null;
+  JL.hash = h; JL.mmLive = mmBaru(); JL.mmSrv = mmBaru();
   // titik yang sudah terkumpul sebelum indeks siap ikut dihitung
-  trailPoints.forEach(p => jlProsesFix(p.lat, p.lon, 10, p.t, true));
+  trailPoints.forEach(p => jlProsesFix(p.lat, p.lon, p.acc != null ? p.acc : 10, p.t, true));
+  setTimeout(() => jlSinkronServer(true), 800);
 }
-function jlProsesFix(lat, lon, acc, t, diam){
-  if(!JL.hash || (acc && acc > JL_AKURASI_MAKS)) return;
-  const baru = [];
-  const cek = (la, lo) => {
-    const bi = Math.floor(la / JL_BUCKET), bj = Math.floor(lo / JL_BUCKET);
-    for(let di = -1; di <= 1; di++) for(let dj = -1; dj <= 1; dj++){
-      const arr = JL.hash.get((bi+di) + ':' + (bj+dj)); if(!arr) continue;
-      for(const q of arr){ if(!JL.done.has(q.id) && haversine(la, lo, q.m[0], q.m[1]) <= JL_RADIUS_M){ JL.done.add(q.id); baru.push(q); } }
-    }
+/* adaptor MM untuk potongan zona di HP */
+function jlAdaptor(baru){
+  return {
+    cari: function(la, lo, R){
+      const out = [], bi = Math.floor(la / JL_BUCKET), bj = Math.floor(lo / JL_BUCKET), kx = 111320 * Math.cos(la * Math.PI / 180), KY = 110574;
+      for(let di = -1; di <= 1; di++) for(let dj = -1; dj <= 1; dj++){
+        const arr = JL.hash.get((bi+di) + ':' + (bj+dj)); if(!arr) continue;
+        for(const q of arr){
+          const ax = (q.a[1] - lo) * kx, ay = (q.a[0] - la) * KY, vx = (q.b[1] - q.a[1]) * kx, vy = (q.b[0] - q.a[0]) * KY, ll = vx*vx + vy*vy;
+          const s = ll ? Math.max(0, Math.min(1, -(ax*vx + ay*vy) / ll)) : 0, ex = ax + vx*s, ey = ay + vy*s, d = Math.sqrt(ex*ex + ey*ey);
+          if(d <= R) out.push([d, q]);
+        }
+      }
+      return out;
+    },
+    ang: q => q.ang, ri: q => q.ri, seq: q => q.seq,
+    tandai: q => { if(!JL.done.has(q.id)){ JL.done.add(q.id); baru.push(q); } },
+    tandaiSeq: (ri, sq) => { const q = (JL.rp[ri] || [])[sq]; if(q && !JL.done.has(q.id)){ JL.done.add(q.id); baru.push(q); } }
   };
-  /* GPS motor jarang rapat (tiap fix bisa 30-60 m). Garis jejak yang tersambung antar-dua titik juga dihitung "dimakan",
-     jadi jalan tidak bolong padahal garis tealnya sudah lewat. Titik antara dibuat tiap ≤8 m; celah >200 m atau >100 dtk tidak disambung. */
-  const pv = JL.prev;
-  if(pv && t > pv.t && (t - pv.t) < 100000){
-    const d = haversine(pv.lat, pv.lon, lat, lon);
-    if(d > 8 && d <= 200){
-      const n = Math.ceil(d / 8);
-      for(let i = 1; i < n; i++) cek(pv.lat + (lat - pv.lat) * i / n, pv.lon + (lon - pv.lon) * i / n);
-    }
-  }
-  cek(lat, lon);
-  JL.prev = {lat: lat, lon: lon, t: t};
+}
+function jlSetelahMakan(baru, lat, lon, t, diam){
   if(!baru.length) return;
   JL.ver++;
   jlGambarMakan(baru);
   clearTimeout(JL.simpanT);
-  JL.simpanT = setTimeout(() => { if(sesi) lsSet('sl2_jl_' + sesi.kode, Array.from(JL.done).slice(-40000)); }, 1500);
+  JL.simpanT = setTimeout(() => { if(sesi) lsSet('sl2_jl2_' + sesi.kode, Array.from(JL.done).slice(-60000)); }, 1500);
   const keys = new Set(baru.map(q => q.key));
   keys.forEach(k => jlEvaluasiPetak(k, lat, lon, t, diam));
+}
+function jlProsesFix(lat, lon, acc, t, diam){
+  if(!JL.hash) return;
+  const baru = [];
+  mmProses(JL.mmLive || (JL.mmLive = mmBaru()), t / 1000, lat, lon, acc, jlAdaptor(baru));
+  jlSetelahMakan(baru, lat, lon, t, diam);
+}
+/* jejak di server (direkam di latar walau tampilan app tertutup) ikut dihitung -> sama dengan dashboard. Hanya jejak sales ini. */
+async function jlSinkronServer(paksa){
+  if(!JL.hash || !sesi || (typeof peranSesi === 'function' && peranSesi()) || JL.sinkJalan) return;
+  if(!paksa && Date.now() - JL.sinkT < 120000) return;
+  JL.sinkJalan = true; JL.sinkT = Date.now();
+  const kode = sesi.kode, kunciW = 'sl2_jlw2_' + kode;
+  let sejak = lsGet(kunciW, null);
+  if(!sejak) sejak = new Date(Date.now() - 31 * 864e5).toISOString();
+  try{
+    for(let hal = 0; hal < 200; hal++){
+      const rows = await restGet('jejak_lokasi?select=lat,lon,waktu,akurasi&kode_salesman=eq.' + encodeURIComponent(kode) + '&waktu=gt.' + encodeURIComponent(sejak) + '&order=waktu.asc&limit=1000');
+      if(!sesi || sesi.kode !== kode || !JL.hash) return;
+      const baru = []; let akhir = null;
+      const A = jlAdaptor(baru);
+      rows.forEach(r => {
+        if(r.lat == null || r.lon == null || !r.waktu) return;
+        const t = Date.parse(r.waktu);
+        mmProses(JL.mmSrv, t / 1000, +r.lat, +r.lon, r.akurasi == null ? null : +r.akurasi, A);
+        akhir = {lat: +r.lat, lon: +r.lon, t: t};
+      });
+      if(rows.length) sejak = rows[rows.length - 1].waktu;
+      if(akhir) jlSetelahMakan(baru, akhir.lat, akhir.lon, akhir.t, true);
+      lsSet(kunciW, sejak);
+      if(rows.length < 1000) break;
+      await new Promise(r => setTimeout(r, 30));   // beri napas ke tampilan
+    }
+    if(typeof segarkanLayarAktif === 'function') segarkanLayarAktif();
+  }catch(e){ /* tanpa sinyal: coba lagi nanti */ }
+  finally{ JL.sinkJalan = false; }
 }
 
 /* --- kotak selesai karena jalannya sudah dilewati --- */
