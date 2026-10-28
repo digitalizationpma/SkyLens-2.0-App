@@ -64,7 +64,7 @@ function mmProses(st, t, lat, lon, acc, A){
 const JL_URL = (typeof DATA_URL === 'string' ? DATA_URL : 'https://digitalizationpma.github.io/SkyLens-2.0-App/') + 'data/jalan/';
 async function jlAmbil(nama){
   const url = JL_URL + nama + '.json';
-  let cache = null; try{ cache = ('caches' in window) ? await caches.open('sl2-jalan') : null; }catch(e){ cache = null; }
+  let cache = null; try{ if('caches' in window){ caches.delete('sl2-jalan').catch(() => {}); cache = await caches.open('sl2-jalan2'); } }catch(e){ cache = null; }   // jalan2: data Garut digabung Cikajang (28 Okt) -> paksa unduh baru
   const dariNet = async () => {
     const r = await fetch(url, {cache: 'no-cache'}); if(!r.ok) throw new Error('http ' + r.status);
     if(cache){ try{ await cache.put(url, r.clone()); }catch(e){} }
