@@ -6,7 +6,7 @@
    ============================================================ */
 const SUPABASE_URL = 'https://bgvdrinvblanlaykydit.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_EMHLQqIuGbFaCBUYkV5yVw_X_yR_aKZ';
-const APP_VERSI = '1.2.4';
+const APP_VERSI = '1.2.5';
 const S = 0.01;       // ukuran petak (derajat)
 const GRID_N = 4;     // 4x4 = 16 kotak per petak
 const NAMA_PRIO = ['-', 'A', 'B', 'C'];
@@ -142,7 +142,7 @@ const flameSvg = (lit, cls, st) => '<svg class="' + (cls || '') + '" viewBox="0 
 const ADA_NATIVE = !!(window.Android && typeof window.Android.info === 'function');
 if(!ADA_NATIVE){ window.Android = buatShimBrowser(); }
 function nat(){ return window.Android; }
-function infoNative(){ try{ return JSON.parse(nat().info()); }catch(e){ return {lokasi:false, notif:false, sepanjang:false, baterai:false, tracking:false, pending:0, merek:'', model:'', android:0, jam_mulai:-1, jam_selesai:-1}; } }
+function infoNative(){ try{ return JSON.parse(nat().info()); }catch(e){ return {lokasi:false, notif:false, sepanjang:false, baterai:false, tracking:false, pending:0, merek:'', model:'', android:0, jam_mulai:-1, jam_selesai:-1, jam_mulai_mnt:-1, jam_selesai_mnt:-1}; } }
 
 function buatShimBrowser(){
   const ring = []; let seq = 0, wid = null, aktif = false, kode = '', petak = null, pending = [], terakhir = 0, galat = '', lastSaved = null, timer = null;
@@ -448,7 +448,8 @@ async function jawabSetuju(ya){
 }
 async function siapkan(){
   const inf = infoNative();
-  const jm = inf.jam_mulai >= 0 ? (String(inf.jam_mulai).padStart(2, '0') + '.00–' + String(inf.jam_selesai).padStart(2, '0') + '.00') : '24 jam';
+  const hm = (n) => String(Math.floor(n / 60)).padStart(2, '0') + '.' + String(n % 60).padStart(2, '0');
+  const jm = inf.jam_mulai_mnt >= 0 ? (hm(inf.jam_mulai_mnt) + '–' + hm(inf.jam_selesai_mnt)) : (inf.jam_mulai >= 0 ? (hm(inf.jam_mulai * 60) + '–' + hm(inf.jam_selesai * 60)) : '24 jam');
   $('jamKerjaTxt').textContent = jm;
   const c = persetujuan();
   if(peranSesi()){ try{ nat().berhenti(); }catch(e){} }
