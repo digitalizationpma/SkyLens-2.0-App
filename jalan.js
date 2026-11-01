@@ -77,11 +77,18 @@ async function jlAmbil(nama){
   const r = await fetch('data/jalan/' + nama + '.json'); if(!r.ok) throw new Error('tidak ada');
   return r.json();
 }
+const JL_PRA = {};   // data jalan yang sudah mulai diunduh/di-parse lebih awal (saat pilih area / buka app) -> sambutan Pinpin tidak menunggu
+function jlPraMuat(dep){
+  if(!dep) return; const n = String(dep).replace(/\s+/g, '_');
+  if(!JL_PRA[n]) JL_PRA[n] = {t: Date.now(), p: jlAmbil(n).catch(() => null)};
+}
 async function jlMuat(dep){
   JL.data = null; JL.depo = dep || ''; JL.rp = {}; JL.pc = {}; JL.stC = {}; JL.hash = null; JL.ver++;
   if(!dep) return;
   try{
-    const d = await jlAmbil(dep.replace(/\s+/g, '_'));
+    const nm = dep.replace(/\s+/g, '_'), pra = JL_PRA[nm]; delete JL_PRA[nm];
+    let d = (pra && Date.now() - pra.t < 10 * 60 * 1000) ? await pra.p : null;
+    if(!d) d = await jlAmbil(nm);
     if(d && d.roads && d.petak) JL.data = d;
   }catch(e){ JL.data = null; }
   try{ JL.done = new Set(sesi ? lsGet('sl2_jl2_' + sesi.kode, []) : []); }catch(e){ JL.done = new Set(); }   // jl2 = potongan 10 m + map-matching (data jl lama 20 m tidak dipakai lagi)

@@ -6,7 +6,7 @@
    ============================================================ */
 const SUPABASE_URL = 'https://bgvdrinvblanlaykydit.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_EMHLQqIuGbFaCBUYkV5yVw_X_yR_aKZ';
-const APP_VERSI = '1.2.5';
+const APP_VERSI = '1.2.6';
 const S = 0.01;       // ukuran petak (derajat)
 const GRID_N = 4;     // 4x4 = 16 kotak per petak
 const NAMA_PRIO = ['-', 'A', 'B', 'C'];
@@ -287,6 +287,7 @@ async function hitungOutbox(){ try{ const all = await obAll(); obSisa = all.leng
    STATE
    ============================================================ */
 let sesi = lsGet('sl2_sesi', null);   // {kode, nama, depot}
+setTimeout(() => { try{ if(sesi && sesi.depot && typeof jlPraMuat === 'function') jlPraMuat(sesi.depot); }catch(e){} }, 0);   // sesi tersimpan: data jalan mulai dimuat sejak app dibuka
 let depotAktif = '';
 let AREA = {zona: [], outlet: []};    // data area sales yg sedang login
 let zonaMap = {};
@@ -386,6 +387,7 @@ async function muatRoster(dep){
 async function pilihDepot(dep){
   depotAktif = dep;
   resetNama();
+  try{ if(typeof jlPraMuat === 'function') jlPraMuat(dep); }catch(e){}   // unduh data jalan sambil sales memilih nama
   $('depotLoading').style.display = 'block'; $('depotInput').disabled = true;
   let roster = [];
   try{ roster = await muatRoster(dep); } finally { $('depotLoading').style.display = 'none'; $('depotInput').disabled = false; }
@@ -465,7 +467,7 @@ async function siapkan(){
   mulaiPoll();
   tampil('scrMain');
   bukaTab(tabAktif || 'beranda');
-  setTimeout(() => { try{ if(window.pinpinSambut) pinpinSambut(false); }catch(e){} }, 500);
+  setTimeout(() => { try{ if(window.pinpinSambut) pinpinSambut(false); }catch(e){} }, 60);
   hitungOutbox().then(() => { prosesOutbox(); segarkanLayarAktif(); });
   muatRingkasan(true);
   await muatDaftarZona();

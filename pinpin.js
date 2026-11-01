@@ -475,9 +475,9 @@
     var coba = 0;
     (function tunggu(){
       coba++;
-      var siap = splashBeres && screenAktif === 'scrMain' && document.visibilityState !== 'hidden' && (typeof JL === 'undefined' || !!JL.data || coba > 30);   // tunggu data jalan (maks ±4,5 dtk) supaya nama jalan besar ikut tampil
-      if(siap || coba > 60) { if(screenAktif === 'scrMain') sambutTampil(); return; }
-      setTimeout(tunggu, 150);
+      var siap = splashBeres && screenAktif === 'scrMain' && document.visibilityState !== 'hidden' && (typeof JL === 'undefined' || !!JL.data || coba > 90);   // tunggu data jalan (maks ±4,5 dtk) supaya nama jalan besar ikut tampil
+      if(siap || coba > 180) { if(screenAktif === 'scrMain') sambutTampil(); return; }
+      setTimeout(tunggu, 50);
     })();
   }
   document.getElementById('btnSambutLagi').addEventListener('click', function(){ petTutup(); setTimeout(function(){ pinpinSambut(true); }, 380); });
