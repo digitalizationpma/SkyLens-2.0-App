@@ -6,7 +6,7 @@
    ============================================================ */
 const SUPABASE_URL = 'https://bgvdrinvblanlaykydit.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_EMHLQqIuGbFaCBUYkV5yVw_X_yR_aKZ';
-const APP_VERSI = '1.2.6';
+const APP_VERSI = '1.2.7';
 const S = 0.01;       // ukuran petak (derajat)
 const GRID_N = 4;     // 4x4 = 16 kotak per petak
 const NAMA_PRIO = ['-', 'A', 'B', 'C'];
@@ -394,7 +394,8 @@ async function pilihDepot(dep){
   if($('depotInput').value !== dep) return;   // pengguna sudah ganti area lagi
   roster = roster.filter(s => !/^vacant$/i.test(namaBersih(s[1]))).sort((a, b) => ((peranNama(a[1]) ? 1 : 0) - (peranNama(b[1]) ? 1 : 0)) || namaBersih(a[1]).localeCompare(namaBersih(b[1])));
   const sel = $('kodeInput'); sel.innerHTML = '<option value="">Pilih namamu…</option>';
-  roster.forEach(s => { const o = document.createElement('option'); o.value = s[0]; o.textContent = (peranNama(s[1]) ? '[' + peranNama(s[1]) + '] ' : '') + (tipeSales(s[1]) ? tipeSales(s[1]) + ' · ' : '') + namaBersih(s[1]) + (peranNama(s[1]) ? '' : ' · ' + s[0]); o.dataset.nama = s[1]; sel.appendChild(o); });
+  const kodeJks = new Set((ROSTER[dep] || []).map(x => String(x[0])));   // kode yang ada di JKS; selain itu = ditambahkan manual lewat dashboard
+  roster.forEach(s => { const o = document.createElement('option'); o.value = s[0]; o.textContent = (peranNama(s[1]) ? '[' + peranNama(s[1]) + '] ' : '') + (tipeSales(s[1]) ? tipeSales(s[1]) + ' · ' : '') + namaBersih(s[1]) + (peranNama(s[1]) ? '' : ' · ' + s[0] + (kodeJks.has(String(s[0])) ? '' : ' · manual')); o.dataset.nama = s[1]; sel.appendChild(o); });
   sel.disabled = false; $('fldNama').classList.remove('dis');
   if(!roster.length) toast('Belum ada nama sales untuk area ini. Hubungi admin.', 4000);
 }
