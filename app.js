@@ -6,7 +6,7 @@
    ============================================================ */
 const SUPABASE_URL = 'https://bgvdrinvblanlaykydit.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_EMHLQqIuGbFaCBUYkV5yVw_X_yR_aKZ';
-const APP_VERSI = '1.2.7';
+const APP_VERSI = '1.2.8';
 const S = 0.01;       // ukuran petak (derajat)
 const GRID_N = 4;     // 4x4 = 16 kotak per petak
 const NAMA_PRIO = ['-', 'A', 'B', 'C'];
@@ -818,7 +818,8 @@ async function muatDaftarZona(){
   /* penugasan otomatis dari JKS: petak yang paling banyak toko AS-IS-nya milik sales ini (+ petak A/B tanpa toko -> sales JKS terdekat). Penugasan manual dari dashboard tetap ikut. */
   try{
     const ada = new Set(zonaList.map(z => keyDari(z[2], z[3])));
-    petakOtomatis(String(sesi.kode)).forEach(z => { const k = keyDari(z[2], z[3]); if(!ada.has(k)){ ada.add(k); zonaList.push(z); } });
+    const alih = new Set((tugas.dialihkan || []).map(Number));   // petak yang sudah dipindah manual ke sales lain -> tidak muncul lagi di sini
+    petakOtomatis(String(sesi.kode)).forEach(z => { const k = keyDari(z[2], z[3]); if(!ada.has(k) && !alih.has(Number(k))){ ada.add(k); zonaList.push(z); } });
   }catch(e){ console.error('petakOtomatis', e); }
   if(sesi && sesi.depot === 'TESTING' && !zonaList.length) zonaList = Object.keys(zonaMap).map(k => zonaMap[k]).filter(Boolean);   // depo uji: kalau belum ditugaskan dari dashboard, 4 petak uji langsung tersedia
   manualList = tugas.area_manual || [];
