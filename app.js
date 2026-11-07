@@ -6,7 +6,7 @@
    ============================================================ */
 const SUPABASE_URL = 'https://bgvdrinvblanlaykydit.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_EMHLQqIuGbFaCBUYkV5yVw_X_yR_aKZ';
-const APP_VERSI = '1.2.8';
+const APP_VERSI = '1.2.9';
 const S = 0.01;       // ukuran petak (derajat)
 const GRID_N = 4;     // 4x4 = 16 kotak per petak
 const NAMA_PRIO = ['-', 'A', 'B', 'C'];
@@ -127,7 +127,7 @@ function dialogSL(o){
 /* ---------- ikon ---------- */
 const IC = {
   back:'<path d="M15 5 8 12l7 7"/>', close:'<path d="M6 6l12 12M18 6 6 18"/>', check:'<path d="m5 12 4.5 4.5L19 7"/>',
-  plus:'<path d="M12 5v14M5 12h14"/>', clock:'<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>', struk:'<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/>', clock:'<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
   cam:'<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>', store:'<path d="M4 9h16l-2-5H6z"/><path d="M5 9v11h14V9"/><path d="M10 20v-6h4v6"/>',
   nav:'<path d="M3 11 21 3l-8 18-2-8z"/>', book:'<path d="M4 5h7a2 2 0 0 1 2 2v12a2 2 0 0 0-2-2H4z"/><path d="M20 5h-5a2 2 0 0 0-2 2v12a2 2 0 0 1 2-2h5z"/>',
   chev:'<path d="m9 6 6 6-6 6"/>', info:'<circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/>', cloud:'<path d="M7 18a4.5 4.5 0 0 1-.5-9 6 6 0 0 1 11.5 1.5A3.75 3.75 0 0 1 17.5 18z"/><path d="m9.5 13 2 2 3.5-4"/>',
@@ -1206,7 +1206,7 @@ function renderDetailTemuan(){
   const lokasi = key == null ? 'Di luar petak penugasan' : ((zonaDariKey(Number(key)) || [])[11] || ('Petak ' + key));
   const lat = v(p.lat, d.lat), lon = v(p.lon, d.lon), acc = v(p.akurasi, d.acc);
   const sub = v(p.jadwal_kunjung_lagi, d.jd) || v(p.alasan_tidak_tertarik, d.al);
-  const bl = v(p.rata_belanja_nabati, d.bl);
+  const bl = v(p.rata_belanja_nabati, d.bl), nord = v(p.nominal_order, d.no);
   const adaFoto = !!RD.fotoUrl || (!!p.foto_url);
   const waktu = new Date(Date.parse(p.tanggal) || t.t);
   const row = (k, val) => val == null || val === '' ? '' : '<div class="sumrow"><span>' + k + '</span><b>' + val + '</b></div>';
@@ -1226,7 +1226,7 @@ function renderDetailTemuan(){
     row('Lokasi', esc(lokasi)) + row('Waktu', esc(waktu.toLocaleDateString('id-ID', {day: 'numeric', month: 'short', year: 'numeric'}) + ' · ' + waktu.toLocaleTimeString('id-ID', {hour: '2-digit', minute: '2-digit'}))) +
     (st === 'sudah_dicover' ? '' : row('Nama toko', esc(nama)) + row('Ukuran', esc(v(p.ukuran_toko, t.uk) || '')) +
       row('Belanja ke', esc([v(p.belanja_kemana, d.ke), v(p.nama_grosir_pasar, d.gr)].filter(Boolean).join(' · '))) +
-      row('Belanja Nabati', bl == null ? null : fmtRp(+bl) + ' / bln') + row('No HP', esc(v(p.no_hp, d.hp) || ''))) +
+      row('Belanja Nabati', bl == null ? null : fmtRp(+bl) + ' / bln') + (nord == null ? '' : '<div class="sumrow ordsum"><span>Nominal Orderan</span><b>' + fmtRp(+nord) + '</b></div>') + row('No HP', esc(v(p.no_hp, d.hp) || ''))) +
     row('Hasil', esc((HASIL_LBL[st] || st || '-') + (SUB_LBL[sub] ? ' · ' + SUB_LBL[sub] : ''))) +
     row('Catatan', esc(v(p.catatan, d.cat) || '')) +
     row('GPS', lat != null ? (Number(lat).toFixed(5) + ', ' + Number(lon).toFixed(5) + (acc != null ? ' (±' + Math.round(acc) + ' m)' : '')) : 'tidak tercatat') +
@@ -2039,7 +2039,7 @@ function jawabProspekTidak(){ $('popupProspek').style.display = 'none'; }
    WIZARD CATAT TEMUAN (4 langkah)
    ============================================================ */
 let W = null;
-function wizBaru(){ return {step: 1, sudah: null, nama: '', ukuran: '', ke: '', grosir: '', belanja: '', hp: '', foto: null, fotoUrl: null, status: '', sub: '', catatan: '', err: {}, simpan: false}; }
+function wizBaru(){ return {step: 1, sudah: null, nama: '', ukuran: '', ke: '', grosir: '', belanja: '', order: '', hp: '', foto: null, fotoUrl: null, status: '', sub: '', catatan: '', err: {}, simpan: false}; }
 /* ---- posisi untuk temuan: fix perekaman (≤3 mnt) atau GPS sekali-ambil (APK 1.2.2+, jalan walau perekaman mati) ---- */
 const POS_TEMUAN_MAKS_MS = 180000;
 let gpsSekali = null, gpsSekaliJalan = false;
@@ -2141,6 +2141,9 @@ function renderWiz(){
       '<div class="col" style="gap:7px" data-f="ke"><span class="lbl">Biasanya belanja ke mana? <span class="req">wajib</span></span><div class="row" style="gap:8px;flex-wrap:wrap">' + chipsHtml('ke', ['Pasar', 'Toko grosir', 'Lainnya']) + '</div>' + (E.ke ? '<span class="err">Pilih salah satu</span>' : '') + '</div>' +
       '<label class="col" style="gap:7px" data-f="grosir"><span class="lbl">Nama pasar / grosirnya <span class="req">wajib</span></span><input class="in' + (E.grosir ? ' bad' : '') + '" value="' + esc(W.grosir) + '" placeholder="Contoh: Pasar Guntur Ciawitali" oninput="W.grosir=this.value" autocomplete="off">' + (E.grosir ? '<span class="err">Isi nama pasar atau grosir langganannya</span>' : '') + '</label>' +
       '<label class="col" style="gap:7px" data-f="belanja"><span class="lbl">Perkiraan belanja Nabati per bulan (Rp) <span class="req">wajib</span></span><input class="in mono' + (E.belanja ? ' bad' : '') + '" type="number" inputmode="numeric" min="0" value="' + esc(W.belanja) + '" placeholder="Contoh: 500000" oninput="W.belanja=this.value;var p=document.getElementById(\'rpPrev\');if(p)p.textContent=this.value===\'\'?\'\':fmtRp(+this.value)"><span class="muted" id="rpPrev" style="font-size:12.5px">' + (W.belanja !== '' ? fmtRp(+W.belanja) : '') + '</span>' + (E.belanja ? '<span class="err">Isi perkiraan belanja (boleh 0)</span>' : '') + '</label>' +
+      '<label class="ordbox' + (E.order ? ' bad' : '') + '" data-f="order"><span class="ordtop"><span class="ordic">' + ico('struk', 'width:20px;height:20px') + '</span><span class="col" style="gap:2px;min-width:0"><b class="ordjud">Nominal Orderan</b><span class="ordsub">Order yang ditulis <u>hari ini</u> · bukan perkiraan per bulan</span></span><span class="ordtag">' + (W.status === 'lanjut_noo' ? 'wajib' : 'wajib kalau Lanjut NOO') + '</span></span>' +
+        '<span class="ordin"><span class="ordrp">Rp</span><input class="in mono" type="number" inputmode="numeric" min="0" value="' + esc(W.order) + '" placeholder="Contoh: 250000" aria-label="Nominal orderan hari ini (Rp)" oninput="W.order=this.value;var p=document.getElementById(\'rpOrd\');if(p)p.textContent=this.value===\'\'?\'Kosongkan kalau belum order\':fmtRp(+this.value)+\' order hari ini\'"></span>' +
+        '<span class="ordprev" id="rpOrd">' + (W.order !== '' ? fmtRp(+W.order) + ' order hari ini' : (E.order ? '' : (W.status === 'lanjut_noo' ? 'Wajib diisi · toko ini Lanjut NOO' : 'Kosongkan kalau belum order'))) + '</span>' + (E.order ? '<span class="err">Toko Lanjut NOO: isi nominal orderan hari ini (lebih dari 0)</span>' : '') + '</label>' +
       '<label class="col" style="gap:7px"><span class="lbl">No HP pemilik <span class="opt">opsional</span></span><input class="in mono" type="tel" inputmode="tel" value="' + esc(W.hp) + '" placeholder="08xx xxxx xxxx" oninput="W.hp=this.value"></label></div>' +
       wizFoot('Lanjut ke foto', 'wizNext()');
   } else if(W.step === 3){
@@ -2167,7 +2170,7 @@ function renderWiz(){
       '<div class="card" style="padding:4px 16px">' +
       '<div class="sumrow"><span>Lokasi</span><b>' + esc(pt.label) + '</b></div><div class="sumrow"><span>Nama toko</span><b>' + esc(W.nama) + '</b></div>' +
       '<div class="sumrow"><span>Ukuran</span><b>' + esc(W.ukuran) + '</b></div><div class="sumrow"><span>Belanja ke</span><b>' + esc(W.ke) + ' · ' + esc(W.grosir) + '</b></div>' +
-      '<div class="sumrow"><span>Belanja Nabati</span><b>' + fmtRp(+W.belanja) + ' / bln</b></div>' + (W.hp ? '<div class="sumrow"><span>No HP</span><b>' + esc(W.hp) + '</b></div>' : '') +
+      '<div class="sumrow"><span>Belanja Nabati</span><b>' + fmtRp(+W.belanja) + ' / bln</b></div>' + (W.order !== '' ? '<div class="sumrow ordsum"><span>Nominal Orderan</span><b>' + fmtRp(+W.order) + '</b></div>' : '') + (W.hp ? '<div class="sumrow"><span>No HP</span><b>' + esc(W.hp) + '</b></div>' : '') +
       '<div class="sumrow"><span>Hasil</span><b>' + (HASIL[W.status] || '-') + (SUB[W.sub] ? ' · ' + SUB[W.sub] : '') + '</b></div>' +
       (W.catatan ? '<div class="sumrow"><span>Catatan</span><b>' + esc(W.catatan) + '</b></div>' : '') + '</div>' +
       (noo ? (posTemuan() ? '<div class="banner ok" style="justify-content:flex-start">' + ico('check', 'width:18px;height:18px') + '<span>NOO sah: ada foto dan lokasi GPS' + (pt.luar ? ' (di luar petak tetap dihitung)' : '') + '.</span></div>' : '<div class="banner warn" style="justify-content:flex-start">' + ico('info', 'width:18px;height:18px') + '<span>Lokasi GPS belum didapat. NOO baru dihitung kalau ada foto <b>dan</b> GPS — tunggu sebentar sebelum menyimpan.</span></div>') : '') +
@@ -2201,6 +2204,7 @@ function wizNext(){
     if(!W.ke) E.ke = true;
     if(!W.grosir.trim()) E.grosir = true;
     if(W.belanja === '' || isNaN(parseFloat(W.belanja)) || parseFloat(W.belanja) < 0) E.belanja = true;
+    if(W.order !== '' && (isNaN(parseFloat(W.order)) || parseFloat(W.order) < 0)) E.order = true;
     W.err = E;
     if(Object.keys(E).length){ renderWiz(); toast('Lengkapi dulu kolom yang bertanda merah', 2600); const f = document.querySelector('#wizBody .in.bad, #wizBody .err'); if(f && f.scrollIntoView) f.scrollIntoView({block: 'center'}); return; }
     W.step = 3; renderWiz(); return;
@@ -2210,6 +2214,11 @@ function wizNext(){
     if(!W.status) E.status = true;
     if(W.status === 'nanti_dikunjungi' && !W.sub) E.sub = true;
     if(W.status === 'tidak_tertarik' && !W.sub) E.sub = true;
+    if(W.status === 'lanjut_noo' && !Object.keys(E).length && !(parseFloat(W.order) > 0)){
+      W.err = {order: true}; W.step = 2; renderWiz(); toast('Lanjut NOO: isi Nominal Orderan dulu', 2800);
+      setTimeout(function(){ const f = document.querySelector('#wizBody .ordbox'); if(f && f.scrollIntoView) f.scrollIntoView({block: 'center'}); const i = f && f.querySelector('input'); if(i) i.focus(); }, 60);
+      return;
+    }
     W.err = E;
     if(Object.keys(E).length){
       renderWiz();
@@ -2354,12 +2363,13 @@ async function wizSimpan(){
   try{
     const p = dasarTemuan(pt);
     Object.assign(p, {nama_toko: W.nama.trim(), ukuran_toko: W.ukuran, belanja_kemana: W.ke, nama_grosir_pasar: W.grosir.trim(), rata_belanja_nabati: parseFloat(W.belanja),
+      nominal_order: W.order === '' ? null : parseFloat(W.order),
       no_hp: W.hp.trim() || null, status_tindak_lanjut: W.status,
       jadwal_kunjung_lagi: W.status === 'nanti_dikunjungi' ? W.sub : null,
       alasan_tidak_tertarik: W.status === 'tidak_tertarik' ? W.sub : null, catatan: W.catatan.trim() || null});
     await obPut({id: 't_' + p.id, tipe: 'temuan', kode: sesi.kode, t: Date.now(), tries: 0, payload: p, foto: W.foto});
     tlUpsert({id: p.id, nama: p.nama_toko, st: W.status, t: Date.now(), key: pt.key, uk: W.ukuran, luar: pt.luar, kirim: false,
-      d: {ke: p.belanja_kemana, gr: p.nama_grosir_pasar, bl: p.rata_belanja_nabati, hp: p.no_hp, jd: p.jadwal_kunjung_lagi, al: p.alasan_tidak_tertarik, cat: p.catatan, lat: p.lat, lon: p.lon, acc: p.akurasi, lbl: pt.label, foto: true}});
+      d: {ke: p.belanja_kemana, gr: p.nama_grosir_pasar, bl: p.rata_belanja_nabati, no: p.nominal_order, hp: p.no_hp, jd: p.jadwal_kunjung_lagi, al: p.alasan_tidak_tertarik, cat: p.catatan, lat: p.lat, lon: p.lon, acc: p.akurasi, lbl: pt.label, foto: true}});
     await hitungOutbox();
     const noo = W.status === 'lanjut_noo' && !!p.lat;
     try{ tutupKatalog(); }catch(e){}
