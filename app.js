@@ -56,6 +56,22 @@ function keyDari(gx, gy){ return gx*100000 + gy; }
 function gxgyDari(key){ const gx = Math.round(key/100000); return [gx, key - gx*100000]; }
 function fmtJarak(m){ return m >= 1000 ? (m/1000).toLocaleString('id-ID', {maximumFractionDigits: 1}) + ' km' : (Math.round(m/10)*10 || 10) + ' m'; }
 function fmtRp(n){ return 'Rp ' + Math.round(n).toLocaleString('id-ID'); }
+/* v20 nominal orderan */
+const ORD_MIN = 100000, ORD_BESAR = 5000000;
+function terbilang(n){
+  n = Math.floor(Math.abs(n)); if(!n) return 'nol';
+  const s = ['', 'satu', 'dua', 'tiga', 'empat', 'lima', 'enam', 'tujuh', 'delapan', 'sembilan', 'sepuluh', 'sebelas'];
+  const t = x => x < 12 ? s[x] : x < 20 ? t(x - 10) + ' belas' : x < 100 ? t(Math.floor(x / 10)) + ' puluh' + (x % 10 ? ' ' + t(x % 10) : '') :
+    x < 200 ? 'seratus' + (x - 100 ? ' ' + t(x - 100) : '') : x < 1000 ? t(Math.floor(x / 100)) + ' ratus' + (x % 100 ? ' ' + t(x % 100) : '') :
+    x < 2000 ? 'seribu' + (x - 1000 ? ' ' + t(x - 1000) : '') : x < 1e6 ? t(Math.floor(x / 1000)) + ' ribu' + (x % 1000 ? ' ' + t(x % 1000) : '') :
+    x < 1e9 ? t(Math.floor(x / 1e6)) + ' juta' + (x % 1e6 ? ' ' + t(x % 1e6) : '') : t(Math.floor(x / 1e9)) + ' miliar' + (x % 1e9 ? ' ' + t(x % 1e9) : '');
+  return t(n);
+}
+function ordTeks(v){
+  if(v === '' || v == null) return '';
+  const n = +v; if(!(n > 0)) return '';
+  const t = terbilang(n) + ' rupiah'; return t.charAt(0).toUpperCase() + t.slice(1) + (n >= ORD_BESAR ? ' — nominal besar, cek lagi ya' : '');
+}
 function etaTeks(m){
   if(m < 40) return 'hampir sampai';
   const mnt = Math.max(1, Math.round((m*FAKTOR_JALAN)/(KECEPATAN_MOTOR_KMH*1000/60)));
@@ -223,7 +239,17 @@ function obOpen(){
     rq.onerror = () => rej(rq.error);
   });
 }
-async function obPut(rec){ const db = await obOpen(); return new Promise((res, rej) => { const tx = db.transaction('outbox', 'readwrite'); tx.objectStore('outbox').put(rec); tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); }); }
+/* v20 mode tester: sesi.tester = true -> data tidak boleh tercatat atas nama sales asli.
+   grid & persetujuan tidak dikirim; temuan dikirim atas nama TEST-KEVIN (depo TESTING, tidak masuk total dashboard). */
+const TESTER_KODE = 'TEST-KEVIN';
+async function obPut(rec){
+  if(sesi && sesi.tester && rec){
+    if(rec.tipe === 'grid' || rec.tipe === 'persetujuan') return;
+    if(rec.tipe === 'temuan'){ rec.kode = TESTER_KODE; if(rec.payload){ rec.payload.catatan = '[UJI ' + sesi.kode + '] ' + (rec.payload.catatan || ''); } }
+  }
+  return obPutAsli(rec);
+}
+async function obPutAsli(rec){ const db = await obOpen(); return new Promise((res, rej) => { const tx = db.transaction('outbox', 'readwrite'); tx.objectStore('outbox').put(rec); tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); }); }
 async function obDel(id){ const db = await obOpen(); return new Promise((res, rej) => { const tx = db.transaction('outbox', 'readwrite'); tx.objectStore('outbox').delete(id); tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); }); }
 async function obAll(){ const db = await obOpen(); return new Promise((res, rej) => { const rq = db.transaction('outbox', 'readonly').objectStore('outbox').getAll(); rq.onsuccess = () => res(rq.result || []); rq.onerror = () => rej(rq.error); }); }
 
@@ -415,11 +441,25 @@ async function masuk(){
     }
     if(!j || !j.ok){ toast((j && j.error) || 'Kode sales belum terdaftar di server. Hubungi admin.', 4200); return; }
     sesi = {kode: kode, nama: nama, depot: depotAktif};
+    if(kode === TESTER_KODE){ const pilih = await pilihSalesTester(); if(pilih) sesi = pilih; }
     lsSet('sl2_sesi', sesi);
     await siapkan();
   } finally { btn.disabled = !$('kodeInput').value; btn.textContent = 'Masuk'; }
 }
 
+async function pilihSalesTester(){   // v20: daftar semua sales dari config (R08/R13/R09)
+  const opsi = [];
+  Object.keys(ROSTER).sort().forEach(d => { if(d === 'TESTING') return; (ROSTER[d] || []).forEach(s => { if(!peranNama(s[1])) opsi.push([d, s[0], s[1]]); }); });
+  let pilihan = '';
+  const html = '<p class="dlg-t">Masuk sebagai sales mana? GPS tidak direkam, kotak tidak dikirim, temuan tercatat sebagai UJI (tidak masuk dashboard).</p>' +
+    '<select id="dlgTester" style="width:100%;min-height:44px;border-radius:12px;padding:0 10px;font:inherit"><option value="">Tetap sebagai TESTER-KEVIN</option>' +
+    opsi.map((o, i) => '<option value="' + i + '">' + esc(o[0] + ' · ' + namaBersih(o[2]) + ' · ' + o[1]) + '</option>').join('') + '</select>';
+  setTimeout(() => { const el = document.getElementById('dlgTester'); if(el) el.onchange = () => { pilihan = el.value; }; }, 50);
+  const ok = await dialogSL({judul: 'Mode tester', html: html, ok: 'Masuk', batal: 'Batal'});
+  if(!ok || pilihan === '') return null;
+  const o = opsi[+pilihan];
+  return {kode: String(o[1]), nama: o[2], depot: o[0], tester: true};
+}
 async function keluar(){
   if(!sesi) return;
   const nm = namaBersih(sesi.nama), inf = infoNative(), tunggu = (obSisa || 0) + (inf.pending || 0);
@@ -455,7 +495,7 @@ async function siapkan(){
   const jm = inf.jam_mulai_mnt >= 0 ? (hm(inf.jam_mulai_mnt) + '–' + hm(inf.jam_selesai_mnt)) : (inf.jam_mulai >= 0 ? (hm(inf.jam_mulai * 60) + '–' + hm(inf.jam_selesai * 60)) : '24 jam');
   $('jamKerjaTxt').textContent = jm;
   const c = persetujuan();
-  if(peranSesi()){ try{ nat().berhenti(); }catch(e){} }
+  if(peranSesi() || (sesi && sesi.tester)){ try{ nat().berhenti(); }catch(e){} }
   else {
     if(!c || !c.setuju){ tampil('scrSetuju'); return; }   // tidak ada tombol menolak; jawaban 'tidak' lama (versi sebelumnya) ditanya ulang
     if(c.setuju){
@@ -474,7 +514,7 @@ async function siapkan(){
   await muatDaftarZona();
 }
 function mulaiTracking(){
-  if(!sesi || peranSesi()) return;
+  if(!sesi || peranSesi() || sesi.tester) return;
   const r = nat().mulai(sesi.kode, sesi.nama, sesi.depot);
   if(r !== 'ok') toast('Perekaman belum jalan: ' + r, 4200);
   mulaiPoll();
@@ -1826,8 +1866,39 @@ function renderSinyalGps(){
   const el = $('gpsLemahBanner'); if(!el) return;
   const st = statusGps(), lemah = st.ditahan_ms > 15000 && screenAktif === 'scrPeta';
   el.style.display = lemah ? 'block' : 'none'; document.body.classList.toggle('gpsLemah', lemah);
-  if(lemah) $('gpsLemahDetik').textContent = Math.round(st.ditahan_ms/1000) >= 120 ? Math.round(st.ditahan_ms/60000) + ' mnt' : Math.round(st.ditahan_ms/1000) + ' dtk';
+  if(lemah) $('gpsLemahDetik').textContent = (Math.round(st.ditahan_ms/1000) >= 120 ? Math.round(st.ditahan_ms/60000) + ' mnt' : Math.round(st.ditahan_ms/1000) + ' dtk') + (GC.wid !== null ? ' · GPS cadangan aktif' + (GC.acc ? ' ±' + Math.round(GC.acc) + ' m' : '') : '');
+  try{ gcAtur(st); }catch(e){}
   if(youMarker && youMarker.getElement()) youMarker.getElement().style.opacity = lemah ? '0.35' : '1';
+}
+/* v20 GPS cadangan: kalau filter GPS bawaan HP menahan titik > 30 dtk (sinyal satelit lemah), app memakai GPS WebView langsung.
+   Titik dengan akurasi <= 50 m digambar & ikut sisir (pencocokan jalan tetap hanya <= 25 m) dan dikirim ke server supaya tosca muncul di dashboard.
+   Berhenti sendiri begitu GPS bawaan normal lagi. Tidak jalan di mode tester, untuk BM/RBM/ASS, atau di luar jam kerja. */
+const GC = {wid: null, antre: [], kirimT: null, lastT: 0, acc: null};
+function gcJamKerja(){
+  const inf = infoNative(); if(inf.jam_mulai_mnt < 0 && inf.jam_mulai < 0) return true;
+  const d = new Date(), m = d.getHours() * 60 + d.getMinutes();
+  const a0 = inf.jam_mulai_mnt >= 0 ? inf.jam_mulai_mnt : inf.jam_mulai * 60, a1 = inf.jam_selesai_mnt >= 0 ? inf.jam_selesai_mnt : inf.jam_selesai * 60;
+  return m >= a0 && m < a1;
+}
+function gcAtur(st){
+  const perlu = ADA_NATIVE && sesi && !sesi.tester && !peranSesi() && st.ditahan_ms > 30000 && gcJamKerja() && navigator.geolocation;
+  if(perlu && GC.wid === null){
+    GC.wid = navigator.geolocation.watchPosition(p => {
+      const acc = p.coords.accuracy || 99, t = Date.now(); GC.acc = acc;
+      if(acc > AKURASI_BUANG_M || t - GC.lastT < 4000) return;
+      GC.lastT = t;
+      prosesFix(p.coords.latitude, p.coords.longitude, acc, t, false); renderPosisi();
+      GC.antre.push({key_petak: zonaAktif ? Number(zonaAktif.key_petak) : null, lat: p.coords.latitude, lon: p.coords.longitude, waktu: new Date(t).toISOString(), akurasi: Math.round(acc), kecepatan: p.coords.speed || 0, baterai: null});
+    }, () => {}, {enableHighAccuracy: true, maximumAge: 3000, timeout: 15000});
+    if(!GC.kirimT) GC.kirimT = setInterval(gcKirim, 60000);
+  } else if(!perlu && GC.wid !== null && st.ditahan_ms < 5000){
+    navigator.geolocation.clearWatch(GC.wid); GC.wid = null; GC.acc = null; gcKirim();
+  }
+}
+async function gcKirim(){
+  if(!GC.antre.length || !sesi || sesi.tester){ if(GC.wid === null && GC.kirimT){ clearInterval(GC.kirimT); GC.kirimT = null; } return; }
+  const batch = GC.antre.slice(0, 200);
+  try{ const j = await rpc('kirim_jejak', {p_kode: sesi.kode, p_titik: batch}); if(j && j.ok) GC.antre.splice(0, batch.length); }catch(e){}
 }
 function pollFix(){
   if(!sesi) return;
@@ -2147,8 +2218,8 @@ function renderWiz(){
     const st = (val, t, d) => '<button type="button" class="rad' + (W.status === val ? ' on' : '') + '" onclick="wizStatus(this,\'' + val + '\')"><span class="dt"></span><span class="col"><b style="font-size:16px">' + t + '</b><span class="muted" style="font-size:12px">' + d + '</span></span></button>';
     const nooBox = '<div class="radnoo' + (W.status === 'lanjut_noo' ? ' on' : '') + (E.order ? ' bad' : '') + '" id="radNoo">' + st('lanjut_noo', 'Lanjut NOO', 'Pemilik setuju jadi toko baru') +
       '<div class="ordsec' + (W.ordTutup ? ' tutup' : '') + '" id="ordSec" data-f="order"><button type="button" class="ordhd" onclick="wizOrdToggle()" aria-expanded="' + (W.ordTutup ? 'false' : 'true') + '">' + ico('struk', 'width:18px;height:18px') + '<b>Nominal orderan</b><span class="ordwj">WAJIB</span><span class="ordval" id="ordVal">' + (W.order !== '' ? fmtRp(+W.order) : '') + '</span>' + ico('chev', 'width:16px;height:16px') + '</button>' +
-      '<div class="ordbody"><span class="ordsub">Nilai transaksi hari ini. Bukan rata-rata belanja</span><label class="ordin"><span class="ordrp">Rp</span><input id="ordInput" type="number" inputmode="numeric" pattern="[0-9]*" min="0" enterkeyhint="done" value="' + esc(W.order) + '" placeholder="0" aria-label="Nominal orderan (Rp)" oninput="wizOrdInput(this)" onkeydown="if(event.key===\'Enter\')this.blur()"></label>' +
-      '<span class="ordprev" id="rpOrd">' + (W.order !== '' ? fmtRp(+W.order) : '') + '</span>' + (E.order ? '<span class="err" id="ordErr">Isi nominal orderan (lebih dari 0)</span>' : '') + '</div></div></div>';
+      '<div class="ordbody"><span class="ordsub">Nilai transaksi hari ini. Bukan rata-rata belanja</span><label class="ordin"><span class="ordrp">Rp</span><input id="ordInput" type="text" inputmode="numeric" pattern="[0-9.]*" enterkeyhint="done" autocomplete="off" value="' + esc(W.order !== '' ? (+W.order).toLocaleString('id-ID') : '') + '" placeholder="0" aria-label="Nominal orderan (Rp)" oninput="wizOrdInput(this)" onkeydown="if(event.key===\'Enter\')this.blur()"></label>' +
+      '<span class="ordprev" id="rpOrd">' + esc(ordTeks(W.order)) + '</span>' + (E.order ? '<span class="err" id="ordErr">' + (E.order === 'min' ? 'Minimal Rp 100.000' : 'Isi nominal orderan (minimal Rp 100.000)') + '</span>' : '') + '</div></div></div>';
     h = wizHead('Foto & hasil kunjungan', esc(W.nama || 'Toko')) +
       '<div class="scrollY" id="wizScroll" style="padding:14px 20px;display:flex;flex-direction:column;gap:12px">' +
       '<div id="wizFoto" data-f="foto"></div>' +
@@ -2184,9 +2255,11 @@ function renderWiz(){
 }
 function wizSudah(v){ W.sudah = v; renderWiz(); }
 function wizOrdInput(inp){
-  W.order = inp.value; const t = inp.value === '' ? '' : fmtRp(+inp.value);
-  const p = $('rpOrd'); if(p) p.textContent = t; const v = $('ordVal'); if(v) v.textContent = t;
-  if(W.err && W.err.order && parseFloat(inp.value) > 0){ W.err.order = false; const e = $('ordErr'); if(e) e.remove(); const rn = $('radNoo'); if(rn) rn.classList.remove('bad'); }
+  const dig = String(inp.value || '').replace(/\D/g, '').replace(/^0+(?=\d)/, '').slice(0, 12);
+  W.order = dig; const f = dig === '' ? '' : (+dig).toLocaleString('id-ID');
+  if(inp.value !== f){ inp.value = f; try{ inp.setSelectionRange(f.length, f.length); }catch(e){} }
+  const p = $('rpOrd'); if(p) p.textContent = ordTeks(dig); const v = $('ordVal'); if(v) v.textContent = dig === '' ? '' : fmtRp(+dig);
+  if(W.err && W.err.order && parseFloat(dig) >= ORD_MIN){ W.err.order = false; const e = $('ordErr'); if(e) e.remove(); const rn = $('radNoo'); if(rn) rn.classList.remove('bad'); }
 }
 function wizOrdToggle(){ W.ordTutup = !W.ordTutup; const sc = $('ordSec'); if(sc){ sc.classList.toggle('tutup', W.ordTutup); sc.querySelector('.ordhd').setAttribute('aria-expanded', W.ordTutup ? 'false' : 'true'); } if(!W.ordTutup){ const i = $('ordInput'); if(i) i.focus(); } }
 function wizBack(){ if(!W) return; if(W.step <= 1){ tutupWizard(); return; } W.step--; renderWiz(); }
@@ -2221,11 +2294,11 @@ function wizNext(){
     if(!W.status) E.status = true;
     if(W.status === 'nanti_dikunjungi' && !W.sub) E.sub = true;
     if(W.status === 'tidak_tertarik' && !W.sub) E.sub = true;
-    if(W.status === 'lanjut_noo' && !(parseFloat(W.order) > 0)){ E.order = true; W.ordTutup = false; }
+    if(W.status === 'lanjut_noo'){ const no = parseFloat(W.order) || 0; if(no < ORD_MIN){ E.order = no > 0 ? 'min' : true; W.ordTutup = false; } }
     W.err = E;
     if(Object.keys(E).length){
       renderWiz();
-      toast(E.foto ? 'Foto toko wajib dilampirkan' : (E.status ? 'Pilih dulu hasil kunjungan' : (E.sub ? 'Pilih salah satu pilihan di bawah hasil' : 'Lanjut NOO: isi nominal orderan dulu')), 2800);
+      toast(E.foto ? 'Foto toko wajib dilampirkan' : (E.status ? 'Pilih dulu hasil kunjungan' : (E.sub ? 'Pilih salah satu pilihan di bawah hasil' : (E.order === 'min' ? 'Nominal orderan minimal Rp100.000' : 'Lanjut NOO: isi nominal orderan dulu'))), 2800);
       if(E.order && !E.foto && !E.sub){ const f = $('radNoo'); if(f && f.scrollIntoView) f.scrollIntoView({block: 'center', behavior: 'smooth'}); }
       return;
     }

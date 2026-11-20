@@ -1,5 +1,5 @@
 /* ============================================================
-   SkyLens 2.0 — JALAN (Pacman) + KOTAK CERDAS   (v1.1.3)
+   SkyLens 2.0 — JALAN (Pacman) + KOTAK CERDAS   (v1.1.3 · aturan v20: tol, jalan ganda, kotak biru 95/75)
    Data per depo: data/jalan/<DEPO>.json (dibuat dari Overture/OSM + lebar jalan toko OPCI).
    - Kotak 4x4 hanya "aktif" kalau ada permukiman (atap >= atapMin). Kotak hutan/sawah tidak dihitung.
    - Ruas jalan dipotong-potong ±10 m. v1.2.3: potongan "dimakan" (jadi teal) lewat MAP-MATCHING (lihat MM di bawah):
@@ -16,6 +16,10 @@ const JL_KOTAK_SELESAI = 0.7;    // 70% panjang jalan di kotak dilewati = kotak 
 const JL_BESAR_SELESAI = 0.7;    // nama jalan besar diberi centang kalau 70% dilewati
 const JL_WARNA = {B: '#1F2C4F', Q: '#1F2C4F', M: '#3B82F6', T: '#FE7A1B', makan: '#00BFA5'};
 const JL_BUCKET = 0.0004;        // ukuran sel indeks spasial (±44 m)
+/* v20 (sama dengan dashboard v33): kotak berisi jalan besar/mobil selesai = jalan besar >= 95% DAN jalan mobil >= 75% dilewati
+   (kelas dihitung kalau >= 30 m di kotak itu). Kotak yang hanya berisi gang tetap aturan lama 70%.
+   Jalan tol (OSM motorway) tidak dihitung & tidak dicocokkan GPS. Jalan besar bergaris ganda (nama sama, searah, 6-40 m): lewat satu sisi = keduanya. */
+const KB_BESAR = 0.95, KB_MOBIL = 0.75;
 
 const JL = {data: null, depo: '', rp: {}, hash: null, done: new Set(), ver: 0, simpanT: null, legOpen: false, mmLive: null, mmSrv: null, sinkT: 0};
 
@@ -138,7 +142,7 @@ function jlPotongan(ri){
       const t0 = j/n, t1 = (j+1)/n;
       const a = [la1 + (la2-la1)*t0, lo1 + (lo2-lo1)*t0], b = [la1 + (la2-la1)*t1, lo1 + (lo2-lo1)*t1];
       const m = [(a[0]+b[0])/2, (a[1]+b[1])/2], cl = jlCellDari(m[0], m[1]);
-      out.push({id: ri + '.' + (seq++), ri: ri, seq: seq - 1, a: a, b: b, m: m, len: L/n, kat: rd[0], key: cl.key, cell: cl.i, ang: ang});
+      out.push({id: ri + '.' + (seq++), ri: ri, seq: seq - 1, a: a, b: b, m: m, len: L/n, kat: rd[0], key: cl.key, cell: cl.i, ang: ang, tol: rd[1] === 'motorway'});
     }
   }
   JL.rp[ri] = out; return out;
@@ -162,14 +166,36 @@ function jlSiapkanIndeks(){
   kunciIdx.forEach(kp => jlRuasPetak(kp).forEach(ri => {
     if(sudah.has(ri)) return; sudah.add(ri);
     jlPotongan(ri).forEach(q => {
+      if(q.tol) return;   // v20: jalan tol tidak dicocokkan
       const bk = Math.floor(q.m[0] / JL_BUCKET) + ':' + Math.floor(q.m[1] / JL_BUCKET);
       let arr = h.get(bk); if(!arr){ arr = []; h.set(bk, arr); } arr.push(q);
     });
   }));
   JL.hash = h; JL.mmLive = mmBaru(); JL.mmSrv = mmBaru();
+  // v20: pasangan jalan besar bergaris ganda
+  h.forEach(arr => arr.forEach(q => {
+    if(q.kat !== 'B' && q.kat !== 'Q') return;
+    const nm = JL.data.roads[q.ri][2] || '', kx = 111320 * Math.cos(q.m[0] * Math.PI / 180), bi = Math.floor(q.m[0] / JL_BUCKET), bj = Math.floor(q.m[1] / JL_BUCKET);
+    let best = null, bd = 41;
+    for(let di = -1; di <= 1; di++) for(let dj = -1; dj <= 1; dj++){
+      const a2 = h.get((bi+di) + ':' + (bj+dj)); if(!a2) continue;
+      for(const t of a2){
+        if(t.ri === q.ri || (t.kat !== 'B' && t.kat !== 'Q') || (JL.data.roads[t.ri][2] || '') !== nm) continue;
+        let da = Math.abs(t.ang - q.ang); if(da > 90) da = 180 - da; if(da > 15) continue;
+        const d = Math.sqrt(Math.pow((t.m[1] - q.m[1]) * kx, 2) + Math.pow((t.m[0] - q.m[0]) * 110574, 2));
+        if(d >= 6 && d < bd){ bd = d; best = t; }
+      }
+    }
+    q.tw = best;
+  }));
   // titik yang sudah terkumpul sebelum indeks siap ikut dihitung
   trailPoints.forEach(p => jlProsesFix(p.lat, p.lon, p.acc != null ? p.acc : 10, p.t, true));
   setTimeout(() => jlSinkronServer(true), 800);
+}
+function jlMakan(q, baru){   // v20: tandai potongan + sisi seberang jalan bergaris ganda
+  if(q.tol) return;
+  if(!JL.done.has(q.id)){ JL.done.add(q.id); baru.push(q); }
+  if(q.tw && !JL.done.has(q.tw.id)){ JL.done.add(q.tw.id); baru.push(q.tw); }
 }
 /* adaptor MM untuk potongan zona di HP */
 function jlAdaptor(baru){
@@ -187,8 +213,8 @@ function jlAdaptor(baru){
       return out;
     },
     ang: q => q.ang, ri: q => q.ri, seq: q => q.seq,
-    tandai: q => { if(!JL.done.has(q.id)){ JL.done.add(q.id); baru.push(q); } },
-    tandaiSeq: (ri, sq) => { const q = (JL.rp[ri] || [])[sq]; if(q && !JL.done.has(q.id)){ JL.done.add(q.id); baru.push(q); } }
+    tandai: q => { jlMakan(q, baru); },
+    tandaiSeq: (ri, sq) => { const q = (JL.rp[ri] || [])[sq]; if(q) jlMakan(q, baru); }
   };
 }
 function jlSetelahMakan(baru, lat, lon, t, diam){
@@ -241,10 +267,19 @@ async function jlSinkronServer(paksa){
 function jlStatKotak(key){   // per kotak: {tot, mkn} panjang potongan di kotak itu (di-cache per versi cakupan)
   const ck = JL.stC || (JL.stC = {});
   const hit = ck[key]; if(hit && hit.v === JL.ver) return hit.st;
-  const st = Array.from({length: GRID_N*GRID_N}, () => ({tot: 0, mkn: 0}));
-  jlPotonganPetak(key).forEach(q => { const s = st[q.cell]; s.tot += q.len; if(JL.done.has(q.id)) s.mkn += q.len; });
+  const st = Array.from({length: GRID_N*GRID_N}, () => ({tot: 0, mkn: 0, bL: 0, bC: 0, mL: 0, mC: 0}));
+  jlPotonganPetak(key).forEach(q => {
+    if(q.tol) return;   // v20: tol tidak dihitung
+    const s = st[q.cell], d = JL.done.has(q.id); s.tot += q.len; if(d) s.mkn += q.len;
+    if(q.kat === 'B' || q.kat === 'Q'){ s.bL += q.len; if(d) s.bC += q.len; } else if(q.kat === 'M'){ s.mL += q.len; if(d) s.mC += q.len; }
+  });
   ck[key] = {v: JL.ver, st: st};
   return st;
+}
+function jlKotakBeres(s){   // v20: aturan kotak biru (sama dengan dashboard)
+  const hb = s.bL >= JL_KOTAK_MIN_M, hm = s.mL >= JL_KOTAK_MIN_M;
+  if(hb || hm) return (!hb || s.bC >= s.bL * KB_BESAR) && (!hm || s.mC >= s.mL * KB_MOBIL);
+  return s.mkn / s.tot >= JL_KOTAK_SELESAI;   // kotak yang hanya berisi gang
 }
 function jlKotakBerjalan(key, i, st){ return (st || jlStatKotak(key))[i].tot >= JL_KOTAK_MIN_M; }
 function jlEvaluasiPetak(key, lat, lon, t, diam){
@@ -254,7 +289,7 @@ function jlEvaluasiPetak(key, lat, lon, t, diam){
     const r = Math.floor(i / GRID_N), c = i % GRID_N;
     if(!jlKotakAktif(key, r, c) || st[i].tot < JL_KOTAK_MIN_M) continue;
     const k = key + ':' + r + ':' + c;
-    if(gridSet.has(k) || st[i].mkn / st[i].tot < JL_KOTAK_SELESAI) continue;
+    if(gridSet.has(k) || !jlKotakBeres(st[i])) continue;
     jlTandaiKotak(key, r, c, lat, lon, t, diam);
   }
 }
@@ -354,6 +389,7 @@ function jlGambarRuas(petaMap, key, grp){
     const kat = rd[0];
     if(kat === 'B') L.polyline(ll, {renderer: rnd, color: '#ffffff', weight: 9, opacity: 0.95, interactive: false}).addTo(g);
     if(kat === 'Q') L.polyline(ll, {renderer: rnd, color: '#ffffff', weight: 7, opacity: 0.7, interactive: false}).addTo(g);
+    if(rd[1] === 'motorway'){ L.polyline(ll, {renderer: rnd, color: '#94A3B8', weight: 4, opacity: 0.8, dashArray: '2 6', interactive: false}).addTo(g); return; }   // v20: tol abu-abu, tidak dihitung
     L.polyline(ll, {renderer: rnd, color: JL_WARNA[kat], weight: kat === 'B' ? 5.5 : (kat === 'Q' ? 4.5 : (kat === 'M' ? 3.2 : 2.4)),
       opacity: 0.95, dashArray: kat === 'T' ? '5 6' : (kat === 'Q' ? '10 7' : null), interactive: false}).addTo(g);
   });
@@ -382,6 +418,7 @@ function jlLegenda(petaMap){
       '<div>' + ln(4, '#1F2C4F', '7 5') + 'Jalan besar? (perlu dicek)</div>' +
       '<div>' + ln(3, '#3B82F6') + 'Jalan mobil</div>' +
       '<div>' + ln(2.4, '#FE7A1B', '4 4') + 'Jalur motor / setapak</div>' +
+      '<div>' + ln(4, '#94A3B8', '2 6') + 'Jalan tol (tidak dihitung)</div>' +
       '<div>' + ln(5, '#00BFA5') + 'Sudah kamu lewati</div>' +
       '<div><span class="jlSw"></span>Kotak tanpa rumah (tidak dihitung)</div></div>';
     L.DomEvent.disableClickPropagation(div);
