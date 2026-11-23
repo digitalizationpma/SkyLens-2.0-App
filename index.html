@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<title>SkyLens 2.0</title>
+<link rel="stylesheet" href="lib/leaflet.css">
+<style>
+/* Font: Inter (dibundel offline). Kalau file fonts/PlusJakartaSans-*.woff2 ditaruh di folder fonts/, font brand dipakai otomatis. */
+@font-face{font-family:'Plus Jakarta Sans';font-weight:400 600;font-style:normal;font-display:swap;src:url(fonts/PlusJakartaSans-Medium.woff2) format('woff2')}
+@font-face{font-family:'Plus Jakarta Sans';font-weight:700 800;font-style:normal;font-display:swap;src:url(fonts/PlusJakartaSans-ExtraBold.woff2) format('woff2')}
+@font-face{font-family:'Inter';font-weight:400 500;font-style:normal;font-display:swap;src:url(fonts/inter-500.woff) format('woff')}
+@font-face{font-family:'Inter';font-weight:600;font-style:normal;font-display:swap;src:url(fonts/inter-600.woff) format('woff')}
+@font-face{font-family:'Inter';font-weight:700;font-style:normal;font-display:swap;src:url(fonts/inter-700.woff) format('woff')}
+@font-face{font-family:'Inter';font-weight:800;font-style:normal;font-display:swap;src:url(fonts/inter-800.woff) format('woff')}
+:root{
+  --white:#FFFFFF; --ground:#F4F6F9; --line:#E3E7EE; --line2:#EEF1F6;
+  --ink:#1C212D; --navy:#1F2C4F; --navy-tint:#EEF1F7; --muted:#5E6678;
+  --orange:#FE7A1B; --orange-soft:#FFF0E4; --orange-ink:#B9480A; --orange-deep:#9A3A06;
+  --red:#9B1C28; --page:#E9ECF1;
+  --f:'Plus Jakarta Sans','Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,'Roboto Mono',monospace;
+  --nav-h:72px;
+  color-scheme:light;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;overscroll-behavior:none}
+body{background:var(--page);color:var(--ink);font-family:var(--f);font-size:15px;line-height:1.4;-webkit-text-size-adjust:100%}
+button{font-family:inherit;color:inherit;cursor:pointer}
+input,select,textarea{font-family:inherit}
+h1,h2,h3,p{margin:0}
+.mono{font-family:var(--mono)}
+.ico{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+
+#app{position:fixed;inset:0;margin:0 auto;max-width:480px;background:var(--ground);overflow:hidden}
+.scr{position:absolute;inset:0;display:none;flex-direction:column;background:var(--ground);overflow:hidden}
+.scr.white{background:#fff}
+.scrollY{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
+.tab{position:absolute;left:0;right:0;top:0;bottom:var(--nav-h);display:none;flex-direction:column;overflow:hidden}
+.pad{padding:22px 20px 28px;display:flex;flex-direction:column;gap:16px}
+.row{display:flex;align-items:center;gap:12px}
+.col{display:flex;flex-direction:column}
+.muted{color:var(--muted)}
+.card{background:#fff;border:1px solid var(--line);border-radius:18px}
+.hidden{display:none!important}
+
+/* tombol */
+.btn{border:0;border-radius:18px;padding:15px 16px;font-size:16px;font-weight:800;min-height:56px;display:flex;align-items:center;justify-content:center;gap:10px;width:100%;line-height:1.2}
+.btn.or{background:var(--orange);color:var(--ink)}
+.btn.nv{background:var(--navy);color:#fff}
+.btn.gh{background:#fff;border:1.5px solid var(--line);color:var(--ink);font-weight:700}
+.btn.sm{min-height:46px;font-size:14px;border-radius:14px;padding:11px 14px}
+.btn:disabled{opacity:.45}
+.btn:active:not(:disabled){transform:scale(.985)}
+.ibtn{width:44px;height:44px;border-radius:12px;border:0;background:var(--ground);display:flex;align-items:center;justify-content:center;flex:none}
+.chip{border:1.5px solid var(--line);border-radius:999px;padding:9px 14px;background:#fff;font-size:14px;font-weight:600;min-height:42px}
+.chip.on{border-color:var(--navy);background:var(--navy);color:#fff}
+.prio{font-size:11px;font-weight:800;border-radius:8px;padding:4px 8px;white-space:nowrap;background:var(--orange-soft);color:var(--orange-deep)}
+.prio.pA{background:#FBE3DF;color:#A32A1C}.prio.pB{background:#FFE9D2;color:#A04A07}.prio.pC{background:#FFF4C2;color:#7A6200}.prio.pX{background:#EEF1F7;color:var(--muted)}
+.prio.man{background:#E3EEFF;color:#0d56c6}
+
+/* form */
+.fld{display:flex;flex-direction:column;gap:6px;border:1.5px solid var(--line);border-radius:16px;padding:10px 14px;background:#fff;min-height:60px;position:relative}
+.fld>span{font-size:12px;color:var(--muted);font-weight:700}
+.fld select{border:0;background:transparent;font-size:16px;font-weight:700;color:var(--ink);appearance:none;-webkit-appearance:none;width:100%;padding:0 22px 0 0;outline:0}
+.fld::after{content:"";position:absolute;right:16px;bottom:22px;width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg);pointer-events:none}
+.fld.on{border-color:var(--navy);background:#F7F8FB}
+.fld.dis{opacity:.55}
+.in{font-size:16px;border:1.5px solid var(--line);border-radius:14px;padding:13px 14px;background:#fff;color:var(--ink);min-height:52px;width:100%;outline:0}
+.in:focus{border-color:var(--navy)}
+.in.bad{border-color:#C2410C;background:#FFF8F2}
+.err{font-size:13px;font-weight:600;color:#9A3412}
+.req{font-size:11px;font-weight:700;color:var(--orange-ink)}
+.opt{font-size:11px;font-weight:600;color:var(--muted)}
+.lbl{font-size:14px;font-weight:700}
+.radnoo{border-radius:16px}
+.radnoo.on{border:2px solid var(--orange);background:#FFF7F0}
+.radnoo.on > .rad{border:0;background:transparent;padding:10px 12px}
+.radnoo .ordsec{display:none}
+.radnoo.on .ordsec{display:block;border-top:1px solid #F6D9C3;margin:0 12px;padding:10px 0 12px}
+.radnoo.bad{border-color:#C2410C;background:#FFF1E6}
+.ordhd{display:flex;align-items:center;gap:8px;width:100%;border:0;background:transparent;padding:2px 0;color:var(--ink);text-align:left}
+.ordhd b{font-size:15px;font-weight:800}
+.ordhd .ico:first-child{color:var(--muted)}
+.ordwj{background:var(--orange);color:#fff;font-size:10.5px;font-weight:800;border-radius:999px;padding:3px 9px;letter-spacing:.04em;margin-left:auto}
+.ordval{display:none;font-size:13px;font-weight:800;color:var(--orange-deep)}
+.ordhd > .ico:last-child{transform:rotate(-90deg);transition:transform .2s;color:var(--muted)}
+.ordsec.tutup .ordhd > .ico:last-child{transform:rotate(90deg)}
+.ordsec.tutup .ordbody{display:none}
+.ordsec.tutup .ordval{display:inline}
+.ordsec.tutup .ordwj{margin-left:auto}
+.ordbody{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+.ordsub{font-size:12.5px;color:var(--muted);font-weight:500}
+.ordin{display:flex;align-items:center;gap:10px;border:2px solid var(--orange);border-radius:14px;background:#fff;padding:0 14px;min-height:58px}
+.ordrp{font-size:17px;font-weight:600;color:var(--muted)}
+.ordin input{flex:1;min-width:0;border:0;outline:0;background:transparent;font-size:26px;font-weight:800;color:var(--ink);font-family:var(--f);padding:10px 0}
+.ordin input::placeholder{color:#9AA3B5}
+.ordin input::-webkit-outer-spin-button,.ordin input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.ordin input[type=number]{-moz-appearance:textfield;appearance:textfield}
+.ordprev{font-size:12.5px;font-weight:700;color:var(--orange-ink);min-height:0}
+.ordprev:empty{display:none}
+.sumrow.ordsum{background:var(--orange-soft);margin:0 -16px;padding-left:16px;padding-right:16px}
+.sumrow.ordsum span,.sumrow.ordsum b{color:var(--orange-deep);font-weight:800}
+
+.steps{display:flex;gap:6px}.steps i{flex:1;height:6px;border-radius:3px;background:var(--line)}
+.steps i.done{background:var(--navy)}.steps i.cur{background:var(--orange)}
+
+/* banner kecil */
+.banner{border-radius:14px;padding:10px 12px;font-size:13px;line-height:1.4;display:flex;gap:10px;align-items:center;justify-content:space-between}
+.banner.ok{background:#EEF1F7;color:var(--navy)}
+.banner.warn{background:var(--orange-soft);color:#7A3306}
+.banner.bad{background:#FDE8E6;color:#8f2a22}
+.banner button{border:0;background:rgba(28,33,45,.08);border-radius:10px;padding:8px 12px;font-size:12.5px;font-weight:800;white-space:nowrap;min-height:36px}
+
+/* nav bawah */
+.bnav{position:absolute;left:0;right:0;bottom:0;height:var(--nav-h);background:#fff;border-top:1px solid var(--line);display:flex;justify-content:space-around;align-items:center;padding:0 6px;z-index:5}
+.bnav button.t{border:0;background:transparent;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;font-weight:700;color:var(--muted);min-width:58px;padding:6px 0}
+.bnav button.t.on{color:var(--ink)}
+.bnav button.t.on .ico{stroke:var(--orange);stroke-width:2.2}
+.bnav .fab{width:60px;height:60px;border-radius:50%;border:0;background:var(--orange);color:var(--ink);margin-top:-30px;box-shadow:0 8px 20px rgba(254,122,27,.4),0 0 0 6px #fff;display:flex;align-items:center;justify-content:center}
+
+/* beranda */
+.hero{border-radius:22px;padding:16px 16px 14px;background:linear-gradient(140deg,#E8620C,#C24A07);color:#fff;display:flex;flex-direction:column;gap:10px;text-align:left;width:100%;border:0}
+.hero .pill{font-size:12px;font-weight:700;background:rgba(255,255,255,.2);border-radius:999px;padding:4px 10px;display:inline-flex;align-items:center;gap:5px}
+.hero .bar{height:9px;border-radius:5px;background:rgba(255,255,255,.28);overflow:hidden}
+.hero .bar i{display:block;height:100%;border-radius:5px;background:#fff;transition:width .5s}
+.hero .ms{display:flex;gap:10px;align-items:center;font-size:13px;line-height:1.3;padding:7px 0;border-top:1px solid rgba(255,255,255,.2)}
+.hero .ms .ck{width:22px;height:22px;border-radius:50%;border:1.5px solid rgba(255,255,255,.65);display:flex;align-items:center;justify-content:center;flex:none;font-size:11px;font-weight:800}
+.hero .ms .ck.done{background:#fff;color:#C24A07;border-color:#fff}
+.hero .ms.lock{opacity:.72}
+.hero .ms .tx{flex:1;min-width:0}
+.hero .ms .tag{font-size:11px;font-weight:800;background:rgba(255,255,255,.2);border-radius:999px;padding:3px 8px;white-space:nowrap}
+.zonecard{text-align:left;padding:14px;display:flex;flex-direction:column;gap:10px;width:100%}
+.zonecard.here{box-shadow:inset 0 0 0 2px var(--orange)}
+.hereTag{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;margin-top:4px;font-size:12px;font-weight:800;color:var(--orange-ink);background:var(--orange-soft);border-radius:999px;padding:3px 10px 3px 8px}
+.hereTag i{width:8px;height:8px;border-radius:50%;background:var(--orange);box-shadow:0 0 0 3px rgba(254,122,27,.25);animation:gdotp 1.6s ease-in-out infinite}
+.seg16{display:grid;grid-template-columns:repeat(16,1fr);gap:2px;flex:1}
+.seg16 i{height:8px;border-radius:2px;background:var(--line)}
+.seg16 i.on{background:var(--navy)}
+.seg16 i.cur{background:var(--orange)}
+.seg16.nol{grid-template-columns:1fr}.seg16.nol i{background:repeating-linear-gradient(45deg,#E6EAF1 0 6px,#F3F5F9 6px 12px)}
+/* jalan (Pacman) + kotak cerdas */
+.jlBox{display:flex;flex-direction:column;gap:7px;border-top:1px solid var(--line2);padding-top:9px}
+.jlJud{font-size:13px;font-weight:800;color:var(--navy);display:inline-flex;align-items:center}
+.jlBar{height:8px;border-radius:5px;background:var(--line);overflow:hidden}.jlBar i{display:block;height:100%;background:#00BFA5;border-radius:5px;transition:width .4s}
+.jlList{display:flex;flex-direction:column;gap:4px}
+.jlRow{display:flex;align-items:center;gap:8px;font-size:12.5px}
+.jlRow .jlCk{width:18px;height:18px;border-radius:50%;border:1.5px solid #C9D2E3;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;color:#fff;flex:none}
+.jlRow.ok .jlCk{background:#00BFA5;border-color:#00BFA5}
+.jlRow .jlNm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.jlRow .jlNm em{font-style:normal;font-size:10.5px;font-weight:800;color:#8A4B00;background:#FFF0E4;border-radius:6px;padding:1px 5px;margin-left:4px}
+.jlRow .mono{font-size:12px;color:var(--muted)}
+.jlKosong{display:flex;flex-direction:column;gap:3px;background:#F4F6F9;border-radius:14px;padding:12px}.jlKosong b{font-size:15px;color:var(--navy)}.jlKosong span{font-size:12.5px;color:var(--muted)}
+.jlLeg{background:#fff;border-radius:14px;box-shadow:0 4px 14px rgba(28,33,45,.2);margin-bottom:8px!important;overflow:hidden;max-width:220px}
+.jlLegBtn{border:0;background:#fff;display:flex;align-items:center;gap:2px;padding:7px 10px;font-size:12px;font-weight:800;color:var(--navy);min-height:34px}
+.jlLegBtn .jlCar{margin-left:4px;transition:transform .15s;color:var(--muted)}.jlLeg.open .jlCar{transform:rotate(180deg)}
+.jlLegIsi{display:none;padding:0 10px 9px;font-size:11.5px;font-weight:600;color:var(--ink);flex-direction:column;gap:4px}.jlLeg.open .jlLegIsi{display:flex}
+.jlLegIsi div{display:flex;align-items:center;gap:7px}
+.jlSw{width:22px;height:12px;border-radius:3px;background:rgba(17,24,39,.42);display:inline-block;flex:none;margin:0 2px}
+.avatar{width:46px;height:46px;border-radius:50%;background:var(--navy);color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none}
+.stat{background:var(--ground);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:2px}
+.stat span{font-size:12px;color:var(--muted);font-weight:600}.stat b{font-size:17px}
+.stat.or{background:var(--orange-soft)}.stat.or span{color:#7A3306}
+.empty{padding:34px 16px;text-align:center;color:var(--muted);font-size:14px;line-height:1.5}
+
+/* riwayat */
+.hist{display:flex;gap:12px;align-items:center;padding:12px}
+.hist .th{width:50px;height:50px;border-radius:14px;flex:none}
+.stat.pred b small{font-size:12px;font-weight:700;color:var(--muted)}
+.stat.pred em{display:block;font-style:normal;font-size:11.5px;color:var(--muted);margin-top:2px}
+.stat.pred em i{font-style:normal;color:#B84A00;font-weight:800}
+.pdIco{width:18px;height:18px;flex:none;fill:none;stroke:#FE7A1B;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+.pdKartu{display:flex;gap:12px;align-items:center;background:var(--navy);color:#fff;border-radius:16px;padding:12px 14px}
+.pdKartu b{font-size:16px;line-height:1.25}.pdKartu span span{font-size:12.5px;color:#C9D0DE;font-weight:600}
+.pdKartu .pdBesar{width:46px;height:46px;border-radius:14px;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;flex:none}
+.pdKartu .pdBesar .pdIco{width:28px;height:28px}
+button.hist{width:100%;text-align:left;font:inherit;color:inherit;border:0;cursor:pointer}
+button.hist:active{transform:scale(.99)}
+.fotoContoh{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.fotoContoh .fc{display:flex;gap:8px;align-items:center;padding:6px;border-radius:14px;background:#F4F6FA}
+.fotoContoh .fc img{width:46px;height:62px;object-fit:cover;border-radius:9px;flex:none}
+.fotoContoh .fc span{font-size:11.5px;line-height:1.3;color:#3B4660}
+.fotoContoh .fc b{display:block;font-size:12.5px;margin-bottom:1px}
+.fotoContoh .ok{box-shadow:inset 0 0 0 1.5px #16A34A}.fotoContoh .ok b{color:#15803D}
+.fotoContoh .no{box-shadow:inset 0 0 0 1.5px #DC2626}.fotoContoh .no b{color:#B91C1C}
+.tagc{align-self:flex-start;font-size:11px;font-weight:800;border-radius:999px;padding:3px 9px}
+.sync{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:10px;font-weight:700;width:58px;text-align:center}
+
+/* akun */
+.cek{display:flex;gap:12px;align-items:center;padding:11px 0;border-top:1px solid var(--line2)}
+.cek:first-child{border-top:0}
+.cek .ic{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;flex:none}
+.cek .ic.y{background:var(--navy-tint);color:var(--navy)}
+.cek .ic.n{background:var(--orange);color:var(--ink)}
+.cek .ic.o{background:#E9ECF1;color:var(--muted)}
+.cek .tx{flex:1;display:flex;flex-direction:column;gap:1px;font-size:14px;font-weight:700}
+.cek .tx small{font-size:12px;color:var(--muted);font-weight:500}
+.cek button{border:0;border-radius:999px;padding:9px 14px;background:var(--orange);color:var(--ink);font-size:13px;font-weight:800;min-height:40px;white-space:nowrap}
+.panduan{background:var(--ground);border-radius:14px;padding:12px 14px;font-size:13px;line-height:1.5;margin-top:6px}
+.panduan h3{font-size:13.5px;margin-bottom:4px}
+.panduan ol{margin:4px 0 0;padding-left:18px}
+.panduan li{margin:4px 0}
+.sec{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:6px 2px -4px}
+.ver{font-size:11.5px;color:#8A93A6;text-align:center}
+
+/* peta */
+#map,#mapAll{position:absolute;inset:0;background:#E7ECF2}
+.leaflet-container{font-family:var(--f)}
+.topcard{position:absolute;left:14px;right:14px;top:14px;z-index:900;background:#fff;border-radius:20px;padding:8px 12px 8px 8px;box-shadow:0 6px 18px rgba(28,33,45,.16);display:flex;align-items:center;gap:10px}
+.navcard{position:absolute;left:14px;right:14px;top:84px;z-index:890;background:var(--navy);color:#fff;border-radius:20px;padding:14px 16px;display:none;gap:14px;align-items:center}
+.navcard .arr{width:60px;height:60px;border-radius:50%;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;flex:none}
+.swMini{flex:none;display:flex;align-items:center;gap:10px;width:100%;border:0;background:none;padding:0;font:inherit;color:var(--navy);min-height:30px;text-align:left}
+.swMini b{font-size:15px;font-weight:800;white-space:nowrap}
+.swMini .swKm{font-size:12px;font-weight:700;color:var(--muted);white-space:nowrap}
+.swMini .swChev{font-style:normal;font-size:12px;color:var(--muted)}
+.swKecil{border:0;background:var(--ground);border-radius:12px;padding:8px;font-size:12.5px;font-weight:700;color:var(--muted);min-height:36px}
+.sweepcard.swmin{padding:9px 14px!important;max-height:none!important;overflow:visible!important;gap:0}
+.sweepcard{position:absolute;left:14px;right:14px;top:84px;z-index:890;background:#fff;border-radius:22px;box-shadow:0 10px 30px rgba(20,24,35,.16);padding:14px 16px;display:none;flex-direction:column;gap:9px;max-height:calc(100% - 230px);overflow-y:auto}
+.zinfo{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;border-top:1px solid var(--line2);padding-top:10px}
+.zinfo div{display:flex;flex-direction:column;gap:1px}.zinfo span{font-size:12px;color:var(--muted);font-weight:600}.zinfo b{font-size:15px}
+.bsheet{position:absolute;left:0;right:0;bottom:0;z-index:890;background:#fff;border-radius:26px 26px 0 0;padding:12px 18px 18px;box-shadow:0 -8px 24px rgba(28,33,45,.12);display:flex;flex-direction:column;gap:10px}
+.grab{display:block;width:44px;height:5px;border-radius:3px;background:#DDE2EA;margin:0 auto;flex:none}
+.bar-actions{display:flex;gap:10px}
+/* posisi toggle Citra/Peta & tombol recenter selalu di atas bottom sheet (tinggi sheet diukur lewat JS -> --shH) */
+.leaflet-bottom.leaflet-left{bottom:calc(var(--shH,120px) + 12px);left:2px}
+#scrPeta .leaflet-bottom.leaflet-left,#tabPeta .leaflet-bottom.leaflet-left{transition:bottom .18s ease}
+.basemapToggle{display:flex;background:#fff;border-radius:14px;box-shadow:0 4px 14px rgba(28,33,45,.2);overflow:hidden;padding:3px;gap:2px}
+.bmBtn{border:0;background:#fff;padding:7px 12px;font-size:12.5px;font-weight:700;color:var(--muted);border-radius:11px}
+.bmBtn.on{background:var(--navy);color:#fff}
+#compassBtn{position:absolute;right:17px;bottom:calc(var(--shH,120px) + 70px);transition:bottom .18s ease;width:40px;height:40px;border-radius:50%;background:#fff;border:0;box-shadow:0 4px 14px rgba(28,33,45,.2);z-index:880;display:none;align-items:center;justify-content:center;padding:0}
+#compassBtn svg{transition:transform .2s linear}
+#compassBtn.off{opacity:.65}
+#recenterBtn{position:absolute;right:14px;bottom:calc(var(--shH,120px) + 14px);transition:bottom .18s ease;width:46px;height:46px;border-radius:50%;background:#fff;border:0;box-shadow:0 4px 14px rgba(28,33,45,.2);z-index:880;display:none;align-items:center;justify-content:center}
+.mapbanner{position:absolute;left:14px;right:14px;z-index:895;font-size:12.5px;line-height:1.4;padding:9px 12px;border-radius:14px;display:none}
+#gpsLemahBanner{top:92px;padding:8px 12px;font-size:12.5px;text-align:center;border-radius:14px;background:#FFF4E0;border:1px solid #F0C27A;color:#8A4B00;box-shadow:0 4px 12px rgba(28,33,45,.12)}
+body.gpsLemah .sweepcard{top:140px!important}
+#searchTokoPanel{display:none;position:absolute;left:14px;right:14px;top:14px;background:#fff;border-radius:20px;padding:12px 14px;box-shadow:0 8px 24px rgba(28,33,45,.2);z-index:950;max-height:72%;overflow-y:auto}
+.tokoRes{border:1px solid var(--line);border-radius:12px;padding:9px 11px;margin:7px 0;display:flex;justify-content:space-between;align-items:center}
+.dotT{width:28px;height:28px;border-radius:50%;flex:none;margin-left:8px}
+
+/* wizard */
+.wizhead{padding:16px 20px 0;display:flex;flex-direction:column;gap:14px;flex:none}
+.wizfoot{padding:12px 20px 18px;border-top:1px solid var(--line2);display:flex;gap:10px;background:#fff;flex:none}
+.opt1{text-align:left;border:1.5px solid var(--line);border-radius:20px;padding:16px;background:#fff;display:flex;gap:14px;align-items:center;min-height:86px;width:100%}
+.opt1.on{border:2px solid var(--orange);background:#FFF7F0;box-shadow:0 0 0 4px var(--orange-soft)}
+.opt1 .bx{width:50px;height:50px;border-radius:16px;background:var(--navy-tint);color:var(--navy);display:flex;align-items:center;justify-content:center;flex:none}
+.opt1.on .bx{background:var(--orange);color:var(--ink)}
+.rad{text-align:left;border:1.5px solid var(--line);border-radius:16px;padding:12px 14px;background:#fff;display:flex;gap:12px;align-items:center;min-height:54px;width:100%}
+.rad.on{border:2px solid var(--orange);background:#FFF7F0}
+.rad .dt{width:22px;height:22px;border-radius:50%;border:2px solid #C3CAD6;flex:none}
+.rad.on .dt{border:7px solid var(--orange)}
+.photo{height:160px;border-radius:18px;border:2px dashed #C3CAD6;background:#F7F8FA;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--navy);width:100%;overflow:hidden;position:relative}
+.photo.bad{border-color:#C2410C;background:#FFF8F2}
+.photo.has{border:0;background:#000}
+.photo img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.photo.det{height:auto;min-height:200px;max-height:62vh;padding:0;border:0;display:block;background:#0F172A;cursor:zoom-in}
+.photo.det img{position:static;display:block;width:100%;height:auto;max-height:62vh;object-fit:contain}
+.photo.det .zoomTip{position:absolute;right:10px;bottom:10px;display:flex;gap:6px;align-items:center;background:rgba(15,23,42,.72);color:#fff;font-size:12px;font-weight:700;border-radius:999px;padding:6px 10px}
+.fotoPenuh{position:absolute;inset:0;z-index:6000;background:#000;display:flex;align-items:center;justify-content:center;animation:fin .15s}
+.fotoPenuh img{max-width:100%;max-height:100%;object-fit:contain}
+.fotoPenuh .ibtn{position:absolute;top:calc(14px + env(safe-area-inset-top,0px));right:14px;background:rgba(255,255,255,.18);color:#fff}
+.fotoPenuh .ibtn .ico{stroke:#fff}
+.photo .retake{position:absolute;top:10px;right:10px;display:flex;gap:6px;align-items:center;border-radius:999px;padding:8px 12px;background:#fff;font-size:13px;font-weight:700;color:var(--ink)}
+.sz{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.sz button{border:1.5px solid var(--line);border-radius:16px;background:#fff;padding:12px 6px;display:flex;flex-direction:column;gap:2px;align-items:center;min-height:68px}
+.sz button b{font-size:17px}.sz button span{font-size:11.5px;color:var(--muted);font-weight:600}
+.sz.two{grid-template-columns:repeat(2,1fr)}
+.sz button.on{border:2px solid var(--orange);background:#FFF7F0}
+.sumrow{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--line2);font-size:14px}
+.sumrow:first-child{border-top:0}.sumrow span{color:var(--muted)}.sumrow b{text-align:right}
+
+/* modal / sheet umum */
+.scrim{position:absolute;inset:0;background:rgba(20,24,35,.45);z-index:2000;display:none;align-items:flex-end}
+.sheetm{background:#fff;border-radius:26px 26px 0 0;width:100%;max-height:86%;display:flex;flex-direction:column;padding:12px 20px 22px;gap:12px;overflow-y:auto;animation:rise .25s ease}
+.sheetm.mid{border-radius:24px;margin:auto 16px;width:auto}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes fin{from{opacity:0}to{opacity:1}}
+#toast{position:absolute;left:16px;right:16px;bottom:calc(var(--nav-h) + 16px);z-index:3000;background:var(--ink);color:#fff;border-radius:16px;padding:12px 14px;font-size:14px;line-height:1.35;display:none;box-shadow:0 8px 24px rgba(20,24,35,.28);pointer-events:none}
+body.nonav #toast{bottom:24px}
+
+/* Pinpin */
+#pet{position:absolute;left:0;top:0;width:76px;height:76px;z-index:1500;touch-action:none;user-select:none;-webkit-user-select:none;border:0;background:transparent;padding:0;display:none}
+#pet.snap{transition:transform .38s cubic-bezier(.3,1.4,.5,1)}
+.petIn{width:100%;height:100%;transform-origin:50% 90%;transition:transform .12s ease-out;filter:drop-shadow(0 6px 8px rgba(28,33,45,.22))}
+.petIn svg{width:100%;height:100%;overflow:visible;display:block}
+#pet .hopW{width:100%;height:100%;animation:idleHop 6s ease-in-out infinite}
+#pet.drag .hopW{animation:none}
+@keyframes idleHop{0%,86%,100%{transform:none}90%{transform:translateY(-12px) scale(.96,1.05)}94%{transform:scale(1.06,.94)}}
+#pet .badge{position:absolute;right:-2px;top:-2px;min-width:24px;height:24px;border-radius:12px;background:var(--navy);color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;padding:0 6px;border:2px solid #fff;gap:2px}
+#petTip{position:absolute;z-index:1499;max-width:200px;background:var(--navy);color:#fff;border-radius:14px;padding:8px 11px;font-size:12.5px;font-weight:700;line-height:1.35;opacity:0;transform:scale(.8);transition:opacity .2s,transform .25s cubic-bezier(.3,1.5,.5,1);pointer-events:none}
+#petTip.show{opacity:1;transform:none}
+#petScrim{position:absolute;inset:0;background:rgba(15,20,32,.45);z-index:2100;opacity:0;pointer-events:none;transition:opacity .25s}
+#petScrim.show{opacity:1;pointer-events:auto}
+#petSheet{position:absolute;left:0;right:0;bottom:0;top:40px;z-index:2101;background:linear-gradient(180deg,#FFF1E6 0,#FFF8F2 300px,#F4F6F9 480px);border-radius:28px 28px 0 0;transform:translateY(105%);transition:transform .42s cubic-bezier(.2,.9,.25,1);display:flex;flex-direction:column;overflow:hidden;visibility:hidden}
+#petSheet.show{transform:none;visibility:visible}
+.pgrab{width:44px;height:5px;border-radius:3px;background:#D5DAE3;margin:8px auto 0;flex:none}
+.shead{display:flex;align-items:center;justify-content:space-between;padding:6px 16px 0;flex:none}
+.round{width:40px;height:40px;border-radius:50%;border:0;background:rgba(28,33,45,.07);color:var(--ink);display:flex;align-items:center;justify-content:center}
+.chipw{font-size:12px;font-weight:800;background:#fff;border:1px solid var(--line);border-radius:999px;padding:6px 12px;display:flex;gap:6px;align-items:center}
+.sbody{flex:1;overflow-y:auto;padding:6px 18px 28px;display:flex;flex-direction:column;gap:14px}
+.sbody>*{flex-shrink:0}
+.pstats{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.pstat{display:flex;flex-direction:column}
+.pstat .k{font-size:14px;font-weight:700}
+.pstat .v{font-size:52px;font-weight:800;line-height:1;letter-spacing:-.03em;display:flex;align-items:center;gap:6px}
+.pstat .v small{font-size:15px;font-weight:700;color:var(--muted);letter-spacing:0;align-self:flex-end;margin-bottom:6px}
+.pstat.r{align-items:flex-end;text-align:right;flex:none}
+.pstat.r .k{white-space:nowrap}
+.pstat:not(.r){min-width:0;flex:1 1 auto}
+.pstat .s{font-size:12px;color:var(--muted);font-weight:600}
+.flame{width:34px;height:40px}.flame.off{filter:grayscale(1);opacity:.45}
+.big{position:relative;height:240px;display:flex;align-items:center;justify-content:center;margin-top:-6px}
+.bigHit{border:0;background:transparent;padding:0;width:210px;height:210px;border-radius:40px}
+.bigHit .hopper{width:100%;height:100%;transform-origin:50% 95%}
+.bigHit svg{width:100%;height:100%;overflow:visible;display:block}
+.hopper.boing{animation:boing .5s cubic-bezier(.3,1.6,.5,1)}
+@keyframes boing{0%{transform:none}25%{transform:scale(1.12,.86)}55%{transform:translateY(-26px) scale(.92,1.1)}80%{transform:scale(1.05,.95)}100%{transform:none}}
+.say{align-self:center;max-width:300px;background:var(--navy);color:#fff;border-radius:16px;padding:9px 14px;font-size:13.5px;font-weight:700;line-height:1.4;text-align:center;position:relative;min-height:40px}
+.say::after{content:"";position:absolute;left:50%;bottom:-6px;width:12px;height:12px;background:var(--navy);transform:translateX(-50%) rotate(45deg);border-radius:2px}
+.tapme{position:absolute;right:6px;bottom:18px;font-size:11px;font-weight:800;color:var(--orange-ink);background:#fff;border:1px solid #FFD9BD;border-radius:999px;padding:4px 9px}
+.pprog{display:flex;flex-direction:column;gap:6px;align-items:center}
+.pbar{width:100%;max-width:250px;height:22px;border-radius:11px;background:#fff;border:1px solid var(--line);position:relative;overflow:hidden}
+.pbar i{position:absolute;left:0;top:0;bottom:0;border-radius:11px;background:repeating-linear-gradient(-45deg,var(--orange) 0 8px,#FF9445 8px 16px);transition:width .5s cubic-bezier(.3,1.2,.5,1)}
+.pbar b{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;font-family:var(--mono)}
+.pcap{font-size:12px;color:var(--muted);font-weight:600;text-align:center}
+.pcard{background:#fff;border:1px solid var(--line);border-radius:20px;padding:14px 14px 6px;display:flex;flex-direction:column}
+.pcard h3{margin:0 0 4px;font-size:15px;font-weight:800;display:flex;justify-content:space-between;align-items:center}
+.pcard h3 span{font-size:12px;color:var(--muted);font-weight:700}
+.pms{display:flex;gap:11px;padding:11px 0;border-top:1px solid var(--line2);align-items:flex-start}
+.pms:first-of-type{border-top:0}
+.pck{width:26px;height:26px;border-radius:50%;border:1.5px solid #D5DAE3;flex:none;display:flex;align-items:center;justify-content:center;color:#fff;margin-top:1px}
+.pck.done{background:var(--navy);border-color:var(--navy)}
+.pms .t{font-size:13.5px;line-height:1.42;font-weight:600}
+.pms .m{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.pill2{font-size:11px;font-weight:800;border-radius:999px;padding:3px 9px;background:var(--orange-soft);color:#9A3A06;font-family:var(--mono)}
+.pill2.n{background:var(--navy-tint);color:var(--navy)}
+.pms.lock .t{color:var(--muted)}
+.pms.lock .pck{color:var(--muted);background:var(--line2)}
+.pms .pck:not(.done){color:var(--muted)}
+.mini{height:6px;border-radius:3px;background:var(--line);margin-top:7px;overflow:hidden}
+.mini i{display:block;height:100%;background:var(--orange);border-radius:3px;transition:width .5s}
+.badges{display:flex;justify-content:space-between;align-items:center;padding:6px 4px 10px}
+.bd{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;font-weight:700;color:var(--muted)}
+.bd svg{width:28px;height:32px}
+.dash{flex:1;height:2px;background:var(--line);margin:0 4px 14px}
+.confetti{position:absolute;inset:0;pointer-events:none;z-index:2200;overflow:hidden}
+.confetti i{position:absolute;top:-12px;width:8px;height:12px;border-radius:2px;animation:fall 1.6s cubic-bezier(.3,.6,.6,1) forwards}
+@keyframes fall{to{transform:translate(var(--dx),900px) rotate(var(--r));opacity:.9}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion: reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+/* gerak maskot */
+
+svg .seg{transform-box:view-box;transform-origin:0 0}
+.rig{transform-box:view-box;transform-origin:100px 190px}
+.shadow{transform-box:fill-box;transform-origin:center}
+.eye{transform-box:fill-box;transform-origin:center;animation:blink 4.6s infinite}
+@keyframes blink{0%,93%,100%{transform:scaleY(1)}96%{transform:scaleY(.1)}}
+.sp{transform-box:fill-box;transform-origin:center;animation:pop 1s ease-in-out infinite}
+.s2{animation-delay:.2s}.s3{animation-delay:.4s}.s4{animation-delay:.6s}
+@keyframes pop{0%,100%{transform:scale(.4) rotate(0);opacity:.35}50%{transform:scale(1.15) rotate(25deg);opacity:1}}
+.nt{animation:float 2s ease-out infinite}.n2{animation-delay:1s}
+@keyframes float{0%{transform:translate(0,8px);opacity:0}25%{opacity:1}100%{transform:translate(10px,-18px);opacity:0}}
+.drop{animation:drop 2.4s ease-in infinite}
+@keyframes drop{0%{transform:translateY(0);opacity:0}20%{opacity:1}100%{transform:translateY(24px);opacity:0}}
+.tl{animation:tearL 1s ease-in infinite;opacity:0}
+.tr{animation:tearR 1s ease-in infinite;opacity:0}
+@keyframes tearL{0%{transform:translate(0,0) scale(.5);opacity:0}12%{opacity:1}100%{transform:translate(-34px,78px) scale(1.05);opacity:0}}
+@keyframes tearR{0%{transform:translate(0,0) scale(.5);opacity:0}12%{opacity:1}100%{transform:translate(34px,78px) scale(1.05);opacity:0}}
+.pud{transform-box:fill-box;transform-origin:center;animation:pud 1s ease-in-out infinite alternate}
+@keyframes pud{from{transform:scaleX(.85)}to{transform:scaleX(1.1)}}
+
+
+/* popup toko bermerek */
+.slPop .leaflet-popup-content-wrapper{border-radius:18px;padding:0;box-shadow:0 12px 32px rgba(28,33,45,.24);background:#fff;color:var(--ink,#1C212D)}
+.slPop .leaflet-popup-content{margin:0;width:232px!important;max-width:calc(100vw - 72px);font-family:inherit}
+.slPop .leaflet-popup-tip{box-shadow:0 8px 16px rgba(28,33,45,.14)}
+.slPop a.leaflet-popup-close-button{top:10px;right:10px;width:26px;height:26px;border-radius:50%;background:var(--ground,#F4F6F9);color:var(--muted,#5B6478);font:700 17px/26px system-ui,sans-serif;text-align:center;padding:0}
+.slPop a.leaflet-popup-close-button:hover{background:#E8ECF3;color:var(--ink,#1C212D)}
+.spB{padding:14px 40px 14px 14px;display:flex;flex-direction:column;gap:8px}
+.spNama{font-size:15px;font-weight:800;line-height:1.25;letter-spacing:-.1px}
+.spChips{display:flex;flex-wrap:wrap;gap:6px}
+.spChip{font-size:11px;font-weight:800;border-radius:99px;padding:3px 9px;letter-spacing:.02em}
+.spTipe{background:var(--soft,#FFF0E4);color:#B9480A}
+.spRow{display:flex;flex-direction:column;gap:1px;padding-top:7px;border-top:1px solid var(--line,#E7EBF2)}
+.spLab{font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted,#5B6478)}
+.spVal{font-size:13px;font-weight:600;word-break:break-word}
+.spMono{font-family:'IBM Plex Mono',ui-monospace,Menlo,monospace;font-size:12.5px}
+
+/* dropdown bermerek (SLSelect) di dalam field form */
+:root{--slsel-bg:#fff;--slsel-line:var(--line);--slsel-pop:#fff;--or-ink:#B9480A}
+.fld .slsel{display:block}
+.fld .slsel-btn{border:0;background:transparent!important;padding:0 24px 0 0;min-height:0;border-radius:0;font-size:16px;font-weight:700;color:var(--ink)}
+.fld .slsel-car{display:none}
+.fld .slsel-lab.ph{color:var(--muted);font-weight:600}
+.slsel-sheet .ttl{font-size:16px}
+.slsel-sheet .slsel-opt{border-radius:14px}
+.slsel-opt.sel{background:var(--soft,#FFF0E4)!important;color:#B9480A}
+
+/* Pinpin lagi mikir di sheet prospek */
+.prospekPin{position:relative;width:110px;height:104px;margin:2px auto -4px;flex:none}
+.prospekPin svg{width:100px;height:100px;display:block;margin:0 auto;overflow:visible;animation:pinMikir 2.6s ease-in-out infinite;transform-origin:50% 90%}
+.prospekPin .qm{position:absolute;right:-2px;top:-2px;width:34px;height:34px;border-radius:50%;background:var(--navy);color:#fff;font:800 20px/34px system-ui,sans-serif;text-align:center;box-shadow:0 4px 12px rgba(31,44,79,.3);animation:qmBob 1.6s ease-in-out infinite}
+@keyframes pinMikir{0%,100%{transform:rotate(-3deg)}50%{transform:rotate(3deg) translateY(-2px)}}
+@keyframes qmBob{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-4px) scale(1.06)}}
+.jksInfo{font-size:12.5px;line-height:1.45;padding:9px 12px;border-radius:14px;background:#F1F3F7;color:#3B4660}
+.jksInfo.on{background:#FFF1E6;color:#6B3200}
+.zNo{flex:none;min-width:28px;height:28px;padding:0 6px;border-radius:9px;background:#EEF1F7;color:var(--navy);font:800 13px/28px system-ui,sans-serif;text-align:center}
+.zonecard{position:relative;overflow:hidden}
+.zonecard.jksHari{background:linear-gradient(135deg,#FFF6EC 0%,#FFE9D4 100%);box-shadow:inset 0 0 0 1px rgba(254,122,27,.32)}
+.zonecard.jksHari.here{box-shadow:inset 0 0 0 2px var(--orange)}
+.zonecard.jksHari::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.65) 0%,rgba(255,255,255,0) 48%);pointer-events:none}
+.zonecard.jksHari::after{content:"";position:absolute;top:-20%;bottom:-20%;left:-40%;width:28%;background:linear-gradient(100deg,rgba(255,255,255,0) 0%,rgba(255,255,255,.75) 50%,rgba(255,255,255,0) 100%);transform:skewX(-18deg);animation:kilatJks 4.2s ease-in-out infinite;pointer-events:none}
+.zonecard.jksHari>*{position:relative;z-index:1}
+.zonecard.jksHari .zNo{background:#FE7A1B;color:#fff}
+.zonecard.jksHari{padding-top:0}
+.jksPita{display:flex;align-items:center;justify-content:space-between;margin:0 -14px 2px;padding:7px 14px;background:linear-gradient(180deg,#C8102E,#A50D25);color:#fff;font-size:12.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;border-radius:inherit;border-bottom-left-radius:0;border-bottom-right-radius:0}
+.jksPita em{font-style:normal;font-size:11.5px;letter-spacing:0;text-transform:none;background:rgba(255,255,255,.2);padding:1px 8px;border-radius:999px}
+@keyframes kilatJks{0%,55%{left:-40%}100%{left:130%}}
+@media (prefers-reduced-motion:reduce){.zonecard.jksHari::after{animation:none;display:none}}
+.lbMati .lbPetak{display:none}
+.jksChip{display:inline-block;align-self:flex-start;margin-top:3px;padding:2px 8px;border-radius:999px;background:#FFF1E6;color:#B84A00;font-size:11.5px;font-weight:800}
+.mgrsel{width:100%;padding:10px 12px;border:1px solid rgba(120,130,150,.35);border-radius:10px;font-size:15px;font-weight:600;color:var(--ink);background:transparent;margin-bottom:4px}
+
+/* dialog bermerek (pengganti confirm/prompt) */
+.dlg-ov{position:absolute;inset:0;z-index:5000;background:rgba(15,23,42,0);display:flex;align-items:center;justify-content:center;padding:24px;transition:background .16s}
+.dlg-ov.on{background:rgba(15,23,42,.52)}
+.dlg{width:100%;max-width:360px;background:#fff;border-radius:24px;padding:24px 20px 18px;box-shadow:0 24px 60px rgba(15,23,42,.3);display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;transform:translateY(14px) scale(.97);opacity:0;transition:transform .18s cubic-bezier(.2,.9,.3,1.2),opacity .16s}
+.dlg-ov.on .dlg{transform:none;opacity:1}
+.dlg-ik{width:56px;height:56px;border-radius:18px;display:flex;align-items:center;justify-content:center;margin-bottom:4px;background:var(--orange-soft);color:var(--orange-ink)}
+.dlg-ik .ico{width:28px;height:28px;stroke-width:2}
+.dlg.navy .dlg-ik{background:var(--navy-tint);color:var(--navy)}
+.dlg.merah .dlg-ik{background:#FBE3DF;color:#A32A1C}
+.dlg h3{font-size:19px;font-weight:800;letter-spacing:-.01em;color:var(--ink)}
+.dlg-t{font-size:14px;color:var(--muted);line-height:1.5}
+.dlg-in{position:relative;width:100%;margin-top:8px}
+.dlg-in input{width:100%;height:54px;border:1.5px solid var(--line);border-radius:16px;padding:0 52px 0 16px;font-size:18px;font-weight:700;letter-spacing:.18em;background:var(--ground);color:var(--ink);outline:none;text-align:center}
+.dlg-in input::placeholder{letter-spacing:0;font-weight:500;color:#9AA2B2;font-size:15px}
+.dlg-in input:focus{border-color:var(--navy);background:#fff;box-shadow:0 0 0 4px var(--navy-tint)}
+.dlg-eye{position:absolute;right:6px;top:7px;width:40px;height:40px;border:0;border-radius:12px;background:transparent;color:var(--muted);display:flex;align-items:center;justify-content:center}
+.dlg-err{min-height:18px;font-size:13px;font-weight:700;color:#B42318;margin-top:2px}
+.dlg-act{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;margin-top:10px}
+.dlg-act .btn{min-height:50px}
+.dlg-ok{background:var(--orange);color:var(--ink)}
+.dlg.navy .dlg-ok{background:var(--navy);color:#fff}
+.dlg.merah .dlg-ok{background:#C62828;color:#fff}
+.dlg.goyang{animation:dlgGoyang .36s}
+@keyframes dlgGoyang{20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+.dlg-av{width:64px;height:64px;border-radius:50%;background:var(--navy);color:#fff;font-weight:800;font-size:22px;display:flex;align-items:center;justify-content:center;margin-bottom:4px;box-shadow:0 0 0 6px var(--navy-tint)}
+.dlg-who{display:flex;flex-direction:column;gap:2px;margin:-2px 0 6px}
+.dlg-who b{font-size:16px;font-weight:800}
+.dlg-who span{font-size:12.5px;color:var(--muted);font-family:var(--mono)}
+.dlg-li{list-style:none;margin:4px 0 0;padding:0;width:100%;display:flex;flex-direction:column;gap:8px;text-align:left}
+.dlg-li li{display:flex;gap:10px;align-items:flex-start;font-size:13.5px;line-height:1.45;color:var(--ink);background:var(--ground);border-radius:14px;padding:11px 12px}
+.dlg-li li .ico{width:18px;height:18px;margin-top:1px;color:var(--navy)}
+.dlg-li li.warn{background:var(--orange-soft);color:var(--orange-deep)}
+.dlg-li li.warn .ico{color:var(--orange-ink)}
+
+/* Pinpin: 10 variasi gerak joget & nangis (dibungkus .gv di atas animasi tangan/ekspresi SKYPET) */
+.gv{width:100%;height:100%;transform-origin:50% 92%}
+.gv svg{width:100%;height:100%;overflow:visible;display:block}
+.gv-goyang{animation:gvGoyang .8s ease-in-out infinite}
+@keyframes gvGoyang{0%,100%{transform:translateX(-14px) rotate(-6deg)}50%{transform:translateX(14px) rotate(6deg)}}
+.gv-putar{animation:gvPutar 1.3s cubic-bezier(.5,0,.4,1) infinite}
+@keyframes gvPutar{0%{transform:rotate(0)}60%,100%{transform:rotate(360deg)}}
+.gv-loncat{animation:gvLoncat .9s ease-in-out infinite}
+@keyframes gvLoncat{0%,100%{transform:translate(-18px,0) scale(1.04,.96)}25%{transform:translate(0,-26px) scale(.96,1.05)}50%{transform:translate(18px,0) scale(1.04,.96)}75%{transform:translate(0,-26px) scale(.96,1.05)}}
+.gv-shimmy{animation:gvShimmy .22s linear infinite}
+@keyframes gvShimmy{0%,100%{transform:skewX(-6deg) translateX(-3px)}50%{transform:skewX(6deg) translateX(3px)}}
+.gv-pompa{animation:gvPompa .6s ease-in-out infinite}
+@keyframes gvPompa{0%,100%{transform:scale(1)}40%{transform:scale(1.12) translateY(-6px)}70%{transform:scale(.97)}}
+.gv-twist{animation:gvTwist 1s ease-in-out infinite}
+@keyframes gvTwist{0%,100%{transform:perspective(500px) rotateY(-35deg)}50%{transform:perspective(500px) rotateY(35deg) translateY(-8px)}}
+.gv-moonwalk{animation:gvMoon 1.8s ease-in-out infinite}
+@keyframes gvMoon{0%,100%{transform:translateX(22px) rotate(-4deg)}50%{transform:translateX(-22px) rotate(-4deg)}52%{transform:translateX(-22px) scaleX(-1) rotate(4deg)}98%{transform:translateX(22px) scaleX(-1) rotate(4deg)}}
+.gv-angguk{animation:gvAngguk .45s ease-in-out infinite}
+@keyframes gvAngguk{0%,100%{transform:rotate(0)}50%{transform:rotate(12deg) translateY(4px)}}
+.gv-salto{animation:gvSalto 1.6s ease-in-out infinite}
+@keyframes gvSalto{0%,15%{transform:translateY(0)}45%{transform:translateY(-40px) rotate(180deg)}75%{transform:translateY(0) rotate(360deg) scale(1.06,.94)}100%{transform:rotate(360deg)}}
+.gv-sesenggukan{animation:gvSeseng .7s ease-in-out infinite}
+@keyframes gvSeseng{0%,60%,100%{transform:translateY(0) scale(1)}70%{transform:translateY(-8px) scale(.97,1.04)}80%{transform:translateY(0) scale(1.03,.97)}90%{transform:translateY(-5px)}}
+.gv-gemetar{animation:gvGemetar .09s linear infinite}
+@keyframes gvGemetar{0%,100%{transform:translateX(-2.5px)}50%{transform:translateX(2.5px)}}
+.gv-lemes{animation:gvLemes 2.4s ease-in-out infinite}
+@keyframes gvLemes{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(14px) scale(1.08,.86)}}
+.gv-ayun{animation:gvAyun 1.6s ease-in-out infinite}
+@keyframes gvAyun{0%,100%{transform:rotate(-12deg)}50%{transform:rotate(12deg)}}
+.gv-meraung{animation:gvMeraung 1.2s ease-in-out infinite}
+@keyframes gvMeraung{0%,100%{transform:rotate(0) scale(1)}40%,60%{transform:rotate(-14deg) translateY(-6px) scale(1.04)}}
+.gv-gubrak{animation:gvGubrak 2.2s ease-in-out infinite}
+@keyframes gvGubrak{0%,10%{transform:rotate(0)}30%,65%{transform:rotate(-82deg) translateY(10px)}80%{transform:rotate(8deg)}100%{transform:rotate(0)}}
+.gv-cegukan{animation:gvCeguk 1.4s ease-out infinite}
+@keyframes gvCeguk{0%,30%,55%,100%{transform:translateY(0)}38%{transform:translateY(-18px) scale(.95,1.06)}63%{transform:translateY(-12px) scale(.97,1.04)}}
+.gv-muter{animation:gvMuter 2.6s ease-in-out infinite}
+@keyframes gvMuter{0%{transform:rotate(0) translateX(0)}25%{transform:rotate(-20deg) translateX(-12px)}50%{transform:rotate(0) translateX(0)}75%{transform:rotate(20deg) translateX(12px)}100%{transform:rotate(0)}}
+.gv-ngambek{animation:gvNgambek .5s ease-in infinite}
+@keyframes gvNgambek{0%,100%{transform:translateY(0) scale(1.06,.92)}45%{transform:translateY(-16px) scale(.96,1.05)}}
+@media (prefers-reduced-motion:reduce){.gv{animation:none!important}}
+</style>
+<style id="patch20251025">
+/* ikon pin di judul */
+.pinIco{width:16px;height:16px;flex:none;display:inline-block;vertical-align:-3px}
+.mpT{display:inline-flex;align-items:center;gap:6px}
+/* chip kata semangat di kepala panel Pinpin */
+#petSheet .chipw{max-width:calc(100% - 100px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#petSheet .chipw #petWho{overflow:hidden;text-overflow:ellipsis}
+.sambutLagi{align-self:center;border:0;background:transparent;color:#B9480A;font:inherit;font-size:12.5px;font-weight:800;padding:8px 10px;min-height:40px;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+/* toko AS-IS di tab Peta */
+.tokoTgl{position:absolute;left:14px;top:74px;z-index:940;display:flex;gap:6px;flex-wrap:wrap;pointer-events:none}
+.tokoTgl button{pointer-events:auto;border:0;border-radius:999px;background:#fff;color:#1C212D;font:inherit;font-size:12.5px;font-weight:800;padding:8px 12px;min-height:38px;display:inline-flex;align-items:center;gap:7px;box-shadow:0 4px 14px rgba(28,33,45,.18);cursor:pointer}
+.tokoTgl button[aria-pressed="false"]{color:#5B6478;background:#F4F6F9}
+.tokoTgl i.d{width:11px;height:11px;border-radius:50%;flex:none;border:2px solid #fff;box-shadow:0 0 0 1px rgba(28,33,45,.25)}
+.tokoTgl i.h{width:11px;height:11px;border-radius:50%;flex:none;background:#1FA35B;border:2px solid #fff;box-shadow:0 0 0 1px rgba(28,33,45,.25)}
+.spSedot{background:#E3F6EB;color:#13683A}
+.spJks{background:#E8ECF6;color:#1F2C4F}
+.spNote{font-size:11.5px;color:#9A3A06;background:#FFF7F0;border-radius:10px;padding:7px 9px;line-height:1.35}
+.spAct{margin-top:2px;border:0;border-radius:12px;background:#1F2C4F;color:#fff;font:inherit;font-size:13px;font-weight:800;min-height:40px;cursor:pointer}
+.spGrid{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
+/* sambutan Pinpin */
+#sambut{position:absolute;inset:0;z-index:2600;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;overflow:hidden;background:rgba(15,20,32,0);transition:background .35s;touch-action:manipulation}
+#sambut.on{background:rgba(15,20,32,.55)}
+#sambut .sbFly{position:absolute;left:50%;top:13%;width:190px;height:190px;margin-left:-95px;transform:translate(260px,-420px) rotate(28deg) scale(.45);opacity:0}
+#sambut.on .sbFly{animation:sbIn 1.15s cubic-bezier(.25,.9,.3,1.12) forwards}
+#sambut .sbFly .sbBob{width:100%;height:100%}
+#sambut.landed .sbFly .sbBob{animation:sbBob 2.4s ease-in-out infinite}
+#sambut .sbFly svg{width:100%;height:100%;overflow:visible;display:block;filter:drop-shadow(0 12px 18px rgba(0,0,0,.28))}
+#sambut .sbTrail{position:absolute;left:50%;top:13%;width:190px;height:190px;margin-left:-95px;pointer-events:none;opacity:0}
+#sambut.on .sbTrail{animation:sbTrail 1s ease-out forwards}
+#sambut .sbTrail i{position:absolute;height:5px;border-radius:3px;background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,194,74,.95));transform-origin:100% 50%}
+#sambut .sbCard{position:relative;width:calc(100% - 24px);max-width:420px;margin:0 12px calc(14px + env(safe-area-inset-bottom,0px));background:#fff;border-radius:26px;padding:18px 18px 16px;box-shadow:0 18px 40px rgba(0,0,0,.3);display:flex;flex-direction:column;gap:12px;transform:translateY(120%);transition:transform .45s cubic-bezier(.2,1.1,.3,1)}
+#sambut.landed .sbCard{transform:none}
+#sambut .sbCard::before{content:"";position:absolute;left:50%;top:-9px;width:18px;height:18px;margin-left:-9px;background:#fff;transform:rotate(45deg);border-radius:3px}
+#sambut .sbHead{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+#sambut .sbDate{font-size:12px;font-weight:800;color:#1F2C4F;background:#EEF1F7;border-radius:999px;padding:5px 10px}
+#sambut .sbJks{font-size:12px;font-weight:800;color:#9A3A06;background:#FFF0E4;border-radius:999px;padding:5px 10px;font-variant-numeric:tabular-nums}
+#sambut .sbMsg{font-size:15.5px;line-height:1.55;color:#1C212D;font-weight:600;min-height:12.4em}
+#sambut .sbMsg b{font-weight:800;color:#B9480A}
+#sambut .sbMsg .cur{display:inline-block;width:2px;height:1.05em;background:#FE7A1B;vertical-align:-2px;margin-left:1px;animation:sbCur .8s steps(1) infinite}
+#sambut .sbToko{display:flex;flex-direction:column;gap:6px;opacity:0;transition:opacity .3s}
+#sambut .sbToko.show{opacity:1}
+#sambut .sbToko .lb{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#5B6478}
+#sambut .sbToko .ls{display:flex;flex-wrap:wrap;gap:6px}
+#sambut .sbToko .ls span{font-size:12px;font-weight:700;border-radius:999px;padding:4px 10px;background:#F4F6F9;border:1px solid #E3E7EF;color:#1C212D}
+#sambut .sbGo{border:0;border-radius:16px;background:#FE7A1B;color:#1C212D;font:inherit;font-size:16px;font-weight:800;min-height:54px;cursor:pointer;box-shadow:0 8px 18px rgba(254,122,27,.35)}
+#sambut .sbSkip{position:absolute;right:14px;top:calc(14px + env(safe-area-inset-top,0px));border:0;border-radius:999px;background:rgba(255,255,255,.18);color:#fff;font:inherit;font-size:12.5px;font-weight:800;padding:8px 12px;min-height:36px;cursor:pointer;opacity:0;transition:opacity .3s .6s}
+#sambut.on .sbSkip{opacity:1}
+#sambut.out{background:rgba(15,20,32,0)}
+#sambut.out .sbCard{transform:translateY(120%)}
+#sambut.out .sbFly{transition:transform .7s cubic-bezier(.5,0,.3,1),opacity .7s ease-in;animation:none;opacity:0}
+@keyframes sbIn{0%{opacity:0;transform:translate(260px,-420px) rotate(28deg) scale(.45)}20%{opacity:1}62%{transform:translate(-30px,24px) rotate(-10deg) scale(1.06)}82%{transform:translate(8px,-6px) rotate(4deg) scale(.98)}100%{opacity:1;transform:none}}
+@keyframes sbTrail{0%{opacity:0;transform:translate(220px,-360px)}20%{opacity:1}70%{opacity:.8;transform:translate(-10px,10px)}100%{opacity:0;transform:none}}
+@keyframes sbBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+@keyframes sbCur{50%{opacity:0}}
+@media (prefers-reduced-motion:reduce){#sambut .sbFly,#sambut.on .sbFly{animation:none;opacity:1;transform:none}#sambut .sbTrail{display:none}}
+</style>
+<style id="patch20251025b">
+/* popup toko ringkas */
+.spHead{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.spHead .spNama{margin:0}
+.spKode{font-family:ui-monospace,"IBM Plex Mono",monospace;font-size:11.5px;font-weight:600;color:var(--muted,#5B6478)}
+.spKpi{display:grid;grid-template-columns:auto auto auto;justify-content:space-between;gap:10px;padding-top:8px;border-top:1px solid var(--line,#E7EBF2);margin-right:-28px}
+.spKpi div{display:flex;flex-direction:column;gap:1px;min-width:0}
+.spKpi span{font-size:10.5px;font-weight:700;color:var(--muted,#5B6478);line-height:1.2;white-space:nowrap}
+.spKpi b{font-size:14px;font-weight:800;white-space:nowrap}
+.spCiri{font-size:12px;font-weight:800;color:#13683A;background:#E3F6EB;border-radius:10px;padding:7px 10px;display:flex;align-items:center;gap:7px}
+.spCiri i{width:9px;height:9px;border-radius:50%;background:#1FA35B;border:2px solid #fff;box-shadow:0 0 0 1px rgba(28,33,45,.25);flex:none}
+/* kartu zona ringkas */
+.stat.cp{padding:7px 10px;gap:0;border-radius:12px}
+.stat.cp span{font-size:11px;white-space:nowrap}
+.stat.cp b{font-size:15px;line-height:1.25}
+.banner.cp{padding:7px 10px;font-size:12.5px;gap:8px;white-space:nowrap}
+/* sambutan 3 tahap */
+#sambut .sbCard{gap:10px}
+#sambut .sbMsg{min-height:0;font-size:16.5px;line-height:1.5}
+#sambut .sbBody{min-height:150px;display:flex;flex-direction:column;gap:10px;justify-content:flex-start}
+#sambut .sbStep{display:flex;align-items:center;justify-content:space-between;gap:10px}
+#sambut .sbDots{display:flex;gap:6px}
+#sambut .sbDots i{width:8px;height:8px;border-radius:4px;background:#E3E7EF;transition:width .25s,background .25s}
+#sambut .sbDots i.on{width:22px;background:#FE7A1B}
+#sambut .sbDots i.done{background:#1F2C4F}
+#sambut .sbNo{font-size:12px;font-weight:800;color:#5B6478}
+#sambut .sbNav{display:flex;gap:8px}
+#sambut .sbPrev{flex:1;border:1.5px solid #E3E7EF;border-radius:16px;background:#fff;color:#1C212D;font:inherit;font-size:15px;font-weight:800;min-height:54px;cursor:pointer}
+#sambut .sbPrev[hidden]{display:none}
+#sambut .sbGo{flex:2}
+#sambut .sbToko{opacity:1}
+#sambut .sbToko .ls span b{font-family:ui-monospace,"IBM Plex Mono",monospace;font-weight:600;color:#5B6478;margin-left:5px;font-size:11px}
+#sambut .sbPop{animation:sbPop .45s cubic-bezier(.3,1.6,.5,1)}
+@keyframes sbPop{0%{transform:scale(1)}30%{transform:scale(1.12,.88)}60%{transform:translateY(-16px) scale(.94,1.08)}100%{transform:none}}
+#sambut .sbFade{animation:sbFade .3s ease-out}
+@keyframes sbFade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+#sambut.out .sbFly{transition:none;opacity:1}
+
+/* ===== putaran 26 Okt: kartu navigasi tunggal, popup toko lega, sheet bisa digeser, tombol (+) tidak terpotong ===== */
+.topcard.navtop{background:var(--navy);color:#fff;padding:0 10px;height:68px;gap:10px;box-shadow:0 8px 22px rgba(20,28,55,.30);box-sizing:border-box}
+.navtop .ibtn{width:44px;height:44px;border-radius:14px;background:rgba(255,255,255,.14);color:#fff}
+.navtop .ibtn .ico{stroke:#fff}
+.navtop .ntxt{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;justify-content:center;cursor:pointer;height:100%}
+.navtop .ntxt b{font-size:16px;line-height:1.15;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.navtop .nsub,.navtop .naddr{font-size:12.5px;line-height:1.2;color:#C9D0DE;font-weight:600;display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.navtop .naddr{display:none}
+.navtop .nrow{display:flex;align-items:center;gap:8px;min-width:0}
+.navtop .nrow b{min-width:0}
+.navtop .neta{flex:none;font-size:12px;font-weight:800;color:#FFB27A;background:rgba(254,122,27,.16);border:1px solid rgba(254,122,27,.35);border-radius:999px;padding:3px 9px;white-space:nowrap;font-family:var(--mono)}
+.navtop .neta:empty{display:none}
+.navtop.open .nsub{display:none}
+.navtop.open .naddr{display:block}
+.nsub .narr{width:15px;height:15px;flex:none;transition:transform .4s}
+.nsub .sep{opacity:.55}
+.gdot{width:9px;height:9px;border-radius:50%;background:var(--orange);flex:none;display:inline-block;animation:gdotp 1.15s ease-in-out infinite}
+.gdot.ok{background:#36D399;animation:none}
+@keyframes gdotp{0%,100%{transform:scale(.7);opacity:.55}50%{transform:scale(1.15);opacity:1}}
+@media (prefers-reduced-motion:reduce){.gdot{animation:none}}
+.sweepcard{top:92px!important;max-height:calc(100% - 250px)!important}
+.navcard{display:none!important}
+.petakLbl{width:max-content;background:var(--navy);color:#fff;font:800 11.5px/1 system-ui,sans-serif;letter-spacing:.04em;padding:6px 10px;border-radius:99px;white-space:nowrap;box-shadow:0 3px 10px rgba(20,28,55,.3);border:2px solid #fff;transform:translate(-50%,-100%)}
+/* popup toko */
+.slPop .leaflet-popup-content{width:300px!important;max-width:calc(100vw - 44px)!important}
+.spB{padding:16px!important;gap:10px!important}
+.spHead{padding-right:30px;flex-direction:column;gap:2px;align-items:flex-start!important}
+.spB .spNama{font-size:16px}
+.spKpi{display:grid!important;grid-template-columns:repeat(3,1fr)!important;gap:8px!important;border-top:0!important;padding-top:0!important;margin-right:0!important;justify-content:stretch!important}
+.spKpi div{background:var(--ground,#F4F6F9);border-radius:12px;padding:9px 6px 8px;align-items:center;text-align:center;gap:3px!important}
+.spKpi span{font-size:10.5px!important;white-space:normal!important;color:var(--muted,#5B6478)}
+.spKpi b{font-size:15px!important}
+.spSales{display:flex;align-items:center;gap:10px;border-top:1px solid var(--line,#E7EBF2);padding-top:10px}
+.spSales .av{width:30px;height:30px;border-radius:50%;background:var(--navy,#1F2C4F);color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none}
+.spSales .tx{display:flex;flex-direction:column;min-width:0;gap:1px}
+.spSales .tx span{font-size:10.5px;font-weight:700;color:var(--muted,#5B6478);letter-spacing:.04em;text-transform:uppercase}
+.spSales .tx b{font-size:13.5px;font-weight:800;line-height:1.25;word-break:break-word}
+.spSales .tx em{font-style:normal;font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--muted,#5B6478)}
+.spSales.kosong .av{background:#C9D0DE}
+/* sheet bawah: pegangan geser + (+) tidak terpotong */
+.bsheet{touch-action:pan-y;transition:transform .22s cubic-bezier(.2,.8,.2,1);will-change:transform}
+.bsheet.dragging{transition:none}
+.bsheet,.bsheet .grab{-webkit-user-select:none;user-select:none}
+.bsheet .btn,.bsheet b,.bsheet span{-webkit-user-select:text}
+.bsheet .grab{position:relative;cursor:grab;touch-action:none;width:48px;height:5px;margin:2px auto 4px}
+.bsheet .grab::before{content:"";position:absolute;left:-70px;right:-70px;top:-14px;bottom:-14px}
+#allSheet{padding-bottom:40px}
+.bnav{z-index:1000}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ============ MASUK ============ -->
+  <section id="scrDepot" class="scr white">
+    <div class="scrollY">
+      <div style="position:relative;padding:36px 24px 28px;display:flex;flex-direction:column;gap:18px;min-height:100%">
+        <svg viewBox="0 0 390 260" aria-hidden="true" style="position:absolute;left:0;top:0;width:100%;height:260px;pointer-events:none"><path d="M-20 230 C80 120 230 70 420 90" fill="none" stroke="#FFF0E4" stroke-width="44" stroke-linecap="round"/></svg>
+        <img src="img/logo-navy.png" alt="SkyLens" style="width:150px;height:auto;position:relative">
+        <div style="position:relative;display:flex;flex-direction:column;gap:4px;margin-top:10px">
+          <h1 style="font-size:26px;font-weight:800;letter-spacing:-.02em">Selamat datang</h1>
+          <p class="muted" style="font-size:15px">Pilih area dan namamu untuk mulai kerja hari ini.</p>
+        </div>
+        <label class="fld" id="fldDepot"><span>Area</span>
+          <select id="depotInput" aria-label="Pilih area"><option value="">Pilih area…</option></select></label>
+        <div id="depotLoading" class="muted" style="display:none;font-size:13px">Memuat daftar sales…</div>
+        <label class="fld dis" id="fldNama"><span>Nama</span>
+          <select id="kodeInput" disabled aria-label="Pilih namamu"><option value="">Pilih area dulu</option></select></label>
+        <button class="btn or" id="btnMasuk" onclick="masuk()" disabled style="margin-top:6px">Masuk</button>
+        <div style="flex:1"></div>
+        <div class="ver" id="verLabel"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ IZIN LOKASI ============ -->
+  <section id="scrSetuju" class="scr white">
+    <div class="scrollY" style="display:flex;flex-direction:column">
+      <div style="padding:40px 24px 24px;display:flex;flex-direction:column;gap:18px;flex:1">
+        <span style="width:64px;height:64px;border-radius:20px;background:#FFF0E4;color:#B9480A;display:flex;align-items:center;justify-content:center"><svg class="ico" viewBox="0 0 24 24" style="width:32px;height:32px"><path d="M3 11 21 3l-8 18-2-8z"/></svg></span>
+        <h1 style="font-size:26px;font-weight:800;line-height:1.2">Boleh rekam rute kerjamu?</h1>
+        <p class="muted" style="font-size:15px;line-height:1.6">SkyLens merekam lokasi HP selama jam kerja <b style="color:var(--ink)" id="jamKerjaTxt">07.30–17.00</b>, termasuk saat layar mati. Gunanya untuk melihat kotak mana yang sudah kamu jelajahi. Data hanya dilihat atasanmu.</p>
+        <div style="flex:1"></div>
+        <button class="btn or" onclick="jawabSetuju(true)">Saya izinkan</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PERSIAPAN HP (onboarding) ============ -->
+  <section id="scrSetelan" class="scr">
+    <div class="scrollY">
+      <div class="pad" style="padding-top:26px">
+        <div><h1 style="font-size:24px;font-weight:800" id="setelanJudul">Persiapan HP</h1><p class="muted" style="font-size:14px;margin-top:4px">Beberapa izin supaya rute tetap terekam walau layar mati</p></div>
+        <div id="setelanBody" style="display:flex;flex-direction:column;gap:14px"></div>
+      </div>
+    </div>
+    <div class="wizfoot"><button class="btn or" id="btnSetelanLanjut" onclick="tutupSetelan()">Lanjut</button></div>
+  </section>
+
+  <!-- ============ UTAMA (tab) ============ -->
+  <section id="scrMain" class="scr">
+    <div id="tabBeranda" class="tab"><div class="scrollY"><div class="pad" id="berandaBody"></div></div></div>
+    <div id="tabPeta" class="tab">
+      <div id="mapAll"></div>
+      <div class="topcard" style="padding:6px 14px 6px 14px;gap:10px">
+        <svg class="ico" viewBox="0 0 24 24" style="color:var(--muted)"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="qAll" class="in" style="border:0;min-height:44px;padding:0;font-size:15px" placeholder="Cari zona atau toko" autocomplete="off">
+      </div>
+      <div id="allRes" style="display:none;position:absolute;left:14px;right:14px;top:70px;z-index:950;background:#fff;border-radius:18px;box-shadow:0 8px 24px rgba(28,33,45,.2);padding:6px 12px;max-height:55%;overflow-y:auto"></div>
+      <div class="tokoTgl" id="tokoTgl"></div>
+      <div class="bsheet" id="allSheet"></div>
+    </div>
+    <div id="tabRiwayat" class="tab"><div class="scrollY"><div class="pad" id="riwayatBody" style="padding-top:20px"></div></div></div>
+    <div id="tabAkun" class="tab"><div class="scrollY"><div class="pad" id="akunBody" style="padding-top:20px"></div></div></div>
+    <nav class="bnav" aria-label="Navigasi bawah">
+      <button class="t" data-tab="beranda" onclick="bukaTab('beranda')"><svg class="ico" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Beranda</button>
+      <button class="t" data-tab="peta" onclick="bukaTab('peta')"><svg class="ico" viewBox="0 0 24 24"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg>Peta</button>
+      <button class="fab" onclick="bukaWizard()" aria-label="Catat temuan"><svg class="ico" viewBox="0 0 24 24" style="width:28px;height:28px;stroke-width:2.4"><path d="M12 5v14M5 12h14"/></svg></button>
+      <button class="t" data-tab="riwayat" onclick="bukaTab('riwayat')"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>Riwayat</button>
+      <button class="t" data-tab="akun" onclick="bukaTab('akun')"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c1-4 4-6 8-6s7 2 8 6"/></svg>Akun</button>
+    </nav>
+  </section>
+
+  <!-- ============ PETA ZONA (menuju / sisir) ============ -->
+  <section id="scrPeta" class="scr">
+    <div style="position:absolute;inset:0"><div id="map"></div></div>
+    <!-- kartu navigasi tunggal (navy): judul area + status jarak/GPS; ketuk = alamat -->
+    <div class="topcard navtop" id="topcardNav">
+      <button class="ibtn" onclick="kembaliKeDaftar()" aria-label="Kembali"><svg class="ico" viewBox="0 0 24 24"><path d="M15 5 8 12l7 7"/></svg></button>
+      <div class="ntxt" id="navTxt" onclick="tapKartuNav()" role="button" tabindex="0" aria-label="Info zona"><span class="nrow"><b id="zoneTitle">—</b><span id="zoneEta" class="neta"></span></span><span id="zoneSub" class="nsub"><i class="gdot"></i>Mencari lokasi GPS…</span><span id="zoneAddr" class="naddr"></span></div>
+      <button class="ibtn" id="searchToggleBtn" onclick="toggleSearchToko()" aria-label="Cek toko"><svg class="ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
+    </div>
+    <div class="navcard" id="navcard"></div>
+    <!-- sisir -->
+    <div class="sweepcard" id="sweepcard"></div>
+    <div class="mapbanner" id="gpsLemahBanner"><b>Sinyal GPS lemah</b>, coba ke tempat terbuka. (<span id="gpsLemahDetik"></span>)</div>
+    <div id="searchTokoPanel">
+      <input id="qTokoHp" class="in" placeholder="Cari kode/nama toko (cek sebelum catat temuan baru)" autocomplete="off">
+      <div id="hintTokoHp" class="muted" style="font-size:12px;margin-top:6px">Ketik minimal 2 huruf/angka</div>
+      <div id="listTokoHp" style="margin-top:6px"></div>
+    </div>
+    <button id="compassBtn" aria-label="Putar peta mengikuti arah jalan"><svg id="compassIco" width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5 16 12H8z" fill="#E5484D"/><path d="M12 21.5 8 12h8z" fill="#1F2C4F"/><circle cx="12" cy="12" r="1.6" fill="#fff"/></svg></button>
+    <button id="recenterBtn" aria-label="Kembali ke posisi kamu"><svg width="22" height="22" viewBox="0 0 24 24"><path d="M12 2.5 L20.5 20.5 L12 16.2 L3.5 20.5 Z" fill="#1F2C4F"/></svg></button>
+    <div class="bsheet" id="zoneSheet"></div>
+  </section>
+
+  <!-- ============ WIZARD CATAT TEMUAN ============ -->
+  <section id="scrTemuan" class="scr white"><div id="wizBody" style="display:flex;flex-direction:column;height:100%"></div></section>
+
+  <!-- ============ Pinpin ============ -->
+  <div id="petTip" role="status"></div>
+  <button type="button" id="pet" aria-label="Pinpin. Ketuk untuk buka panel, geser untuk pindah"><div class="hopW"><div class="petIn" id="petIn"></div></div><span class="badge" id="petBadge"></span></button>
+  <div id="petScrim"></div>
+  <section id="petSheet" role="dialog" aria-modal="true" aria-label="Panel Pinpin" aria-hidden="true">
+    <div class="pgrab"></div>
+    <div class="shead">
+      <button type="button" class="round" id="petClose" aria-label="Tutup panel"><svg class="ico" viewBox="0 0 24 24" style="width:18px;height:18px"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+      <span class="chipw"><span id="petWho">Pinpin</span></span>
+      <span class="round" aria-hidden="true" style="background:transparent"></span>
+    </div>
+    <div class="sbody" id="petBody">
+      <div class="pstats">
+        <div class="pstat"><span class="k">Streak harian</span><span class="v"><span id="pStreakIco"></span><span id="pStreak">0</span><small>hari</small></span><span class="s" id="pStreakNote"></span></div>
+        <div class="pstat r"><span class="k">Total NOO</span><span class="v" id="pTotal">0</span><span class="s" id="pTodayNote"></span></div>
+      </div>
+      <div class="say" id="pSay" aria-live="polite"></div>
+      <div class="big"><button type="button" class="bigHit" id="bigHit"><div class="hopper" id="hopper"></div></button><span class="tapme">ketuk Pinpin</span></div>
+      <div class="pprog"><div class="pbar" id="pBarWrap" role="img"><i id="pBarFill"></i><b id="pBarTxt"></b></div><span class="pcap" id="pBarCap"></span></div>
+      <div class="pcard"><h3><span class="mpT"><svg class="pinIco" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C16.4 2 19 5 19 8.8 19 13 14.4 15.6 12 22 9.6 15.6 5 13 5 8.8 5 5 7.6 2 12 2Z" fill="#FE7A1B"/><circle cx="12" cy="8.9" r="2.9" fill="#fff"/></svg>Misi dari Pinpin</span> <span id="pMisiCount"></span></h3><div id="pMissions"></div></div>
+      <div class="pcard"><h3>Lencana streak <span>dapat NOO tiap hari kerja</span></h3><div class="badges" id="pBadges"></div></div>
+      <button type="button" class="sambutLagi" id="btnSambutLagi">Dengar sambutan Pinpin hari ini lagi</button>
+    </div>
+    <div class="confetti" id="pConfetti"></div>
+  </section>
+
+  <!-- ============ MODAL ============ -->
+  <div class="scrim" id="popupProspek">
+    <div class="sheetm">
+      <i class="grab"></i>
+      <div class="prospekPin" id="prospekPin" aria-hidden="true"></div>
+      <h2 style="font-size:20px;font-weight:800;text-align:center">Lagi prospek toko baru?</h2>
+      <p class="muted" style="text-align:center;font-size:14px">Kamu berhenti beberapa menit di sini. Mau catat toko yang ada di dekatmu?</p>
+      <div class="bar-actions"><button class="btn gh" onclick="jawabProspekTidak()">Tidak</button><button class="btn or" onclick="jawabProspekYa()">Ya, catat</button></div>
+    </div>
+  </div>
+
+  <div class="scrim" id="modalKatalog" style="z-index:2600;align-items:stretch;background:#EDEFF4">
+    <div id="katWrap" style="display:flex;flex-direction:column;width:100%;height:100%;padding-top:env(safe-area-inset-top,0px)">
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 14px 8px">
+        <div style="flex:1;min-width:0"><h2 style="font-size:17px;font-weight:800;line-height:1.2">Katalog Produk Nabati</h2>
+          <p class="muted" id="katHint" style="font-size:12.5px">Cubit untuk zoom · ketuk 2x untuk perbesar</p></div>
+        <span id="katPg" style="font-size:12px;font-weight:800;background:var(--navy-tint);color:var(--navy);border-radius:99px;padding:5px 10px;flex:none">Hal. 1/2</span>
+        <button type="button" class="round" onclick="tutupKatalog()" style="flex:none;background:#fff" aria-label="Tutup"><svg class="ico" viewBox="0 0 24 24" style="width:18px;height:18px"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+      </div>
+      <div id="katStage" style="position:relative;flex:1;overflow:hidden;touch-action:none;background:#EDEFF4;user-select:none;-webkit-user-select:none">
+        <div id="katContent" style="position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform">
+          <img src="" data-src="katalog/1.jpg" alt="Katalog produk halaman 1" draggable="false" style="width:100%;display:block;pointer-events:none;-webkit-user-drag:none">
+          <img src="" data-src="katalog/2.jpg" alt="Katalog promo halaman 2" draggable="false" style="width:100%;display:block;margin-top:8px;pointer-events:none;-webkit-user-drag:none">
+        </div>
+        <button type="button" id="katReset" onclick="katReset()" style="position:absolute;right:12px;bottom:12px;display:none;border:0;border-radius:99px;background:var(--navy);color:#fff;font-weight:800;font-size:13px;padding:9px 14px;box-shadow:0 6px 18px rgba(31,44,79,.3)">Pas layar</button>
+      </div>
+      <div style="padding:10px 14px calc(12px + env(safe-area-inset-bottom,0px))"><button class="btn or" onclick="tutupKatalog()">Lanjut isi form</button></div>
+    </div>
+  </div>
+
+  <div class="scrim" id="modalManualBackdrop">
+    <div class="sheetm">
+      <i class="grab"></i>
+      <h2 style="font-size:20px;font-weight:800">Buat area uji</h2>
+      <p class="muted" style="font-size:13px">Area ±150×150 m di sekitar lokasi GPS kamu sekarang (khusus tes).</p>
+      <input class="in" type="text" id="manualNama" placeholder="Contoh: Tes depan rumah">
+      <div class="bar-actions"><button class="btn gh" onclick="tutupModalManual()">Batal</button><button class="btn or" id="manualSubmitBtn" onclick="submitAreaManual()">Buat &amp; buka</button></div>
+    </div>
+  </div>
+
+  <div id="toast" role="status"></div>
+  <input type="file" id="fotoInput" accept="image/*" capture="environment" style="display:none" onchange="onPhoto(this)">
+</div>
+
+<script src="lib/leaflet.js"></script>
+<script src="lib/leaflet-rotate.js"></script>
+<script>if(window.L&&L.Map){L.Map.mergeOptions({rotateControl:false});}</script>
+<script src="config.js"></script>
+<script src="skypet.js"></script>
+<script src="slselect.js"></script>
+<script src="app.js"></script>
+<script src="jalan.js"></script>
+<script src="pandu.js"></script>
+<script src="pinpin.js"></script>
+<script>SLSelect.init({sheet: true}); startApp();</script>
+</body>
+</html>
