@@ -6,7 +6,7 @@
    ============================================================ */
 const SUPABASE_URL = 'https://bgvdrinvblanlaykydit.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_EMHLQqIuGbFaCBUYkV5yVw_X_yR_aKZ';
-const APP_VERSI = '1.2.10';
+const APP_VERSI = '1.2.11';
 const S = 0.01;       // ukuran petak (derajat)
 const GRID_N = 4;     // 4x4 = 16 kotak per petak
 const NAMA_PRIO = ['-', 'A', 'B', 'C'];
@@ -281,6 +281,8 @@ async function prosesOutbox(){
         }catch(e){ obGalat = e.message; break; }
       }
     }
+    // 2b) v25 laporan jalan (foto + RPC kirim_lapor_jalan)
+    if(typeof lj25KirimAntrean === 'function'){ try{ await lj25KirimAntrean(all); }catch(e){} }
     // 3) temuan (satu per satu, urut waktu)
     const tem = all.filter(x => x.tipe === 'temuan').sort((a, b) => a.t - b.t);
     for(const rec of tem){
@@ -663,6 +665,7 @@ async function muatRingkasan(paksa){
   }catch(e){ /* offline: pakai cache */ }
   segarkanLayarAktif();
   if(typeof petRender === 'function') petRender();
+  if(typeof f25Segarkan === 'function') f25Segarkan(paksa);   // v25
 }
 function noosah(p, adaFoto){ return p.status_tindak_lanjut === 'lanjut_noo' && !!adaFoto && p.lat != null && p.lon != null; }
 /** Angka yang ditampilkan = cache server + temuan yang masih antre di HP (belum terkirim). */
@@ -1200,6 +1203,7 @@ function renderBeranda(){
   h += mgrBarHtml();
   if(obSisa > 0) h += '<div class="banner warn"><span>' + obSisa + ' data (temuan/sisir) menunggu terkirim — otomatis dicoba lagi.</span><button onclick="kirimSemuaSekarang()">Kirim</button></div>';
   h += heroHtml();
+  if(typeof ku25BerandaHtml === 'function') h += ku25BerandaHtml();   // v25
   jksPetakSegar();
   const tampilIdx = zonaList.map((z, i) => i).filter(i => zonaTampil(zonaList[i]));
   const nz = tampilIdx.length, sembunyi = jumlahKuningTersembunyi();
@@ -1258,7 +1262,7 @@ function renderRiwayat(){
 
 /* ---------- DETAIL TEMUAN (ketuk kartu riwayat) — isi sama dengan ringkasan terakhir form ---------- */
 const HASIL_LBL = {lanjut_noo: 'Lanjut NOO', nanti_dikunjungi: 'Nanti dikunjungi lagi', tidak_tertarik: 'Tidak tertarik', sudah_dicover: 'Sudah dicover sales Nabati'};
-const SUB_LBL = {'1_minggu': 'seminggu lagi', '2_minggu': '2 minggu lagi', grosir_saja: 'beli di grosir saja', order_kecil: 'order <100rb'};
+const SUB_LBL = {stok_ada: 'stok masih ada', pemilik_tidak_ada: 'pemilik tidak ada', '1_minggu': 'seminggu lagi', '2_minggu': '2 minggu lagi', grosir_saja: 'beli di grosir saja', order_kecil: 'order <100rb'};
 let RD = null;
 function rdLepasFoto(){ if(RD && RD.blobUrl){ try{ URL.revokeObjectURL(RD.blobUrl); }catch(e){} } }
 async function bukaDetailTemuan(id){
@@ -1574,6 +1578,7 @@ function tokoAllTgl(){
     (tokoAllOn && nSed ? '<button type="button" aria-pressed="true" style="cursor:default" tabindex="-1"><i class="h"></i>Order &lt;200rb · ' + nSed + '</button>' : '');
   const nC = zonaList.filter(z => z[23] === 3).length;
   if(nC) h += '<button type="button" aria-pressed="' + tampilC + '" onclick="setTampilC(' + (!tampilC) + ')"><i class="d" style="background:#f1c40f"></i>Petak kuning · ' + nC + '</button>';
+  if(typeof ku25ChipHtml === 'function') h += ku25ChipHtml();   // v25
   if(el.dataset.sig !== h){ el.innerHTML = h; el.dataset.sig = h; }
 }
 function tokoAllSet(){
@@ -1584,6 +1589,7 @@ function tokoAllSet(){
 function tokoAllGambar(){
   if(!mapAll) return;
   tokoAllTgl();
+  try{ if(typeof ku25Gambar === 'function') ku25Gambar(); }catch(e){}   // v25
   const daftar = tokoAllOn ? tokoAllDaftar() : [];
   const sig = tokoAllOn + '|' + daftar.length + '|' + (sesi ? sesi.kode : '');
   if(sig === tokoAllSig) return; tokoAllSig = sig;
@@ -1601,6 +1607,7 @@ function tokoAllGambar(){
 }
 function petaSemuaSheet(){
   const sh = $('allSheet'); if(!sh) return;
+  if(typeof ku25Sheet === 'function' && ku25Sheet()) return;   // v25: mode kunjungi ulang
   if(sh.__selSig !== allSel){ sh.__selSig = allSel; if(sheetLipat.allSheet) sheetBuka('allSheet'); }
   let h = '<i class="grab"></i>';
   if(allSel < 0 || !zonaList[allSel]){
@@ -2256,7 +2263,7 @@ function renderWiz(){
       '<div class="row" style="gap:8px;flex-wrap:wrap">' + gpsChipHtml() + (pt.luar ? '<span class="prio man">Di luar petak · tetap bisa dicatat</span>' : '') + '</div></div>' +
       wizFoot(W.sudah === 'ya' ? 'Simpan cepat' : 'Lanjut', W.sudah === 'ya' ? 'wizCepat()' : 'wizNext()', !W.sudah);
   } else if(W.step === 2){
-    h = wizHead('Data toko', 'Calon toko baru · ' + esc(pt.label)) +
+    h = wizHead('Data toko', (W.ulang ? 'Kunjungi ulang ke-' + ((W.ulang.ke || 1) + 1) : 'Calon toko baru') + ' · ' + esc(pt.label)) +
       '<div class="scrollY" id="wizScroll" style="padding:18px 20px;display:flex;flex-direction:column;gap:18px">' +
       '<label class="col" style="gap:7px" data-f="nama"><span class="lbl">Nama toko <span class="req">wajib</span></span><input class="in' + (E.nama ? ' bad' : '') + '" value="' + esc(W.nama) + '" placeholder="Contoh: Toko Berkah Jaya" oninput="W.nama=this.value" autocomplete="off">' + (E.nama ? '<span class="err">Isi nama tokonya</span>' : '') + '</label>' +
       '<div class="col" style="gap:7px" data-f="ukuran"><span class="lbl">Ukuran toko <span class="req">wajib</span></span><div class="col" style="gap:8px"><div class="sz">' + [['RT-L', 'Large'], ['RT-M', 'Medium'], ['RT-S', 'Small']].map(v => '<button type="button" class="' + (W.ukuran === v[0] ? 'on' : '') + '" onclick="wizPilih(this,\'ukuran\',\'' + v[0] + '\')"><b>' + v[0] + '</b><span>' + v[1] + '</span></button>').join('') + '</div><div class="sz two">' + [['SG', 'Semi Grosir'], ['GR', 'Grosir']].map(v => '<button type="button" class="' + (W.ukuran === v[0] ? 'on' : '') + '" onclick="wizPilih(this,\'ukuran\',\'' + v[0] + '\')"><b>' + v[0] + '</b><span>' + v[1] + '</span></button>').join('') + '</div></div>' + (E.ukuran ? '<span class="err">Pilih ukuran toko</span>' : '') + '</div>' +
@@ -2276,8 +2283,8 @@ function renderWiz(){
       '<div id="wizFoto" data-f="foto"></div>' +
       '<span class="lbl">Hasil kunjungan <span class="req">wajib</span></span>' +
       '<div class="col" style="gap:8px" data-f="status">' + nooBox + st('nanti_dikunjungi', 'Nanti dikunjungi lagi', 'Jadwalkan kunjungan ulang') + st('tidak_tertarik', 'Tidak tertarik', 'Catat alasannya') + (E.status ? '<span class="err">Pilih hasil kunjungan</span>' : '') + '</div>' +
-      '<div class="col" style="gap:8px;display:' + (W.status === 'nanti_dikunjungi' ? 'flex' : 'none') + '" id="subNantiWrap" data-f="sub"><span class="lbl">Perkiraan kunjungan lagi</span><div class="row" style="gap:8px;flex-wrap:wrap">' +
-        [['1_minggu', 'Seminggu lagi'], ['2_minggu', '2 minggu lagi']].map(v => '<button type="button" class="chip' + (W.sub === v[0] ? ' on' : '') + '" onclick="wizPilih(this,\'sub\',\'' + v[0] + '\')">' + v[1] + '</button>').join('') + '</div>' + (E.sub && W.status === 'nanti_dikunjungi' ? '<span class="err">Pilih salah satu</span>' : '') + '</div>' +
+      '<div class="col" style="gap:8px;display:' + (W.status === 'nanti_dikunjungi' ? 'flex' : 'none') + '" id="subNantiWrap" data-f="sub"><span class="lbl">Kenapa dikunjungi lagi? <span class="muted" style="font-weight:600">(jadwal ulang otomatis)</span></span><div class="row" style="gap:8px;flex-wrap:wrap">' +
+        [['stok_ada', 'Stok masih ada'], ['pemilik_tidak_ada', 'Pemilik tidak ada']].map(v => '<button type="button" class="chip' + (W.sub === v[0] ? ' on' : '') + '" onclick="wizPilih(this,\'sub\',\'' + v[0] + '\')">' + v[1] + '</button>').join('') + '</div>' + (E.sub && W.status === 'nanti_dikunjungi' ? '<span class="err">Pilih salah satu</span>' : '') + '</div>' +
       '<div class="col" style="gap:8px;display:' + (W.status === 'tidak_tertarik' ? 'flex' : 'none') + '" id="subTidakWrap" data-f="sub"><span class="lbl">Alasan tidak tertarik</span><div class="row" style="gap:8px;flex-wrap:wrap">' +
         [['grosir_saja', 'Beli di grosir saja'], ['order_kecil', 'Order <100rb']].map(v => '<button type="button" class="chip' + (W.sub === v[0] ? ' on' : '') + '" onclick="wizPilih(this,\'sub\',\'' + v[0] + '\')">' + v[1] + '</button>').join('') + '</div>' + (E.sub && W.status === 'tidak_tertarik' ? '<span class="err">Pilih salah satu</span>' : '') + '</div>' +
       '<button type="button" id="katalogBtn" onclick="bukaKatalog()" style="display:' + (W.status === 'lanjut_noo' ? 'flex' : 'none') + ';gap:12px;align-items:center;border:0;border-radius:16px;padding:12px 14px;background:var(--navy);color:#fff;text-align:left;min-height:56px">' + ico('book', 'color:#FE7A1B') + '<span style="flex:1"><b style="font-size:14px">Tunjukkan katalog Nabati</b><br><span style="font-size:12px;color:#C9D0DE">Opsional · tidak memotong form</span></span>' + ico('chev') + '</button>' +
@@ -2285,7 +2292,7 @@ function renderWiz(){
       wizFoot('Lanjut ke ringkasan', 'wizNext()');
   } else {
     const HASIL = {lanjut_noo: 'Lanjut NOO', nanti_dikunjungi: 'Nanti dikunjungi lagi', tidak_tertarik: 'Tidak tertarik'};
-    const SUB = {'1_minggu': 'seminggu lagi', '2_minggu': '2 minggu lagi', grosir_saja: 'beli di grosir saja', order_kecil: 'order <100rb'};
+    const SUB = {stok_ada: 'stok masih ada', pemilik_tidak_ada: 'pemilik tidak ada', '1_minggu': 'seminggu lagi', '2_minggu': '2 minggu lagi', grosir_saja: 'beli di grosir saja', order_kecil: 'order <100rb'};
     const noo = W.status === 'lanjut_noo';
     h = wizHead('Cek & simpan', esc(W.nama || 'Toko')) +
       '<div class="scrollY" id="wizScroll" style="padding:14px 20px;display:flex;flex-direction:column;gap:12px">' +
@@ -2495,10 +2502,12 @@ async function wizSimpan(){
       no_hp: W.hp.trim() || null, status_tindak_lanjut: W.status,
       jadwal_kunjung_lagi: W.status === 'nanti_dikunjungi' ? W.sub : null,
       alasan_tidak_tertarik: W.status === 'tidak_tertarik' ? W.sub : null, catatan: W.catatan.trim() || null});
+    if(typeof ku25Payload === 'function') ku25Payload(p, W);   // v25: kunjungi ulang
     await obPut({id: 't_' + p.id, tipe: 'temuan', kode: sesi.kode, t: Date.now(), tries: 0, payload: p, foto: W.foto});
     tlUpsert({id: p.id, nama: p.nama_toko, st: W.status, t: Date.now(), key: pt.key, uk: W.ukuran, luar: pt.luar, kirim: false,
       d: {ke: p.belanja_kemana, gr: p.nama_grosir_pasar, bl: p.rata_belanja_nabati, no: p.nominal_order, hp: p.no_hp, jd: p.jadwal_kunjung_lagi, al: p.alasan_tidak_tertarik, cat: p.catatan, lat: p.lat, lon: p.lon, acc: p.akurasi, lbl: pt.label, foto: true}});
     await hitungOutbox();
+    try{ if(typeof ku25SetelahSimpan === 'function') ku25SetelahSimpan(p, W); }catch(e){}
     const noo = W.status === 'lanjut_noo' && !!p.lat;
     try{ tutupKatalog(); }catch(e){}
     tutupWizard();

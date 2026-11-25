@@ -272,8 +272,10 @@ function jlStatKotak(key){   // per kotak: {tot, mkn} panjang potongan di kotak 
   const st = Array.from({length: GRID_N*GRID_N}, () => ({tot: 0, mkn: 0, bL: 0, bC: 0, mL: 0, mC: 0}));
   jlPotonganPetak(key).forEach(q => {
     if(q.tol) return;   // v20: tol tidak dihitung
+    const kat = (typeof lj25Kat === 'function') ? lj25Kat(q) : q.kat;   // v25: ruas hasil lapor jalan (disetujui) diubah/keluar dari hitungan
+    if(kat === null) return;
     const s = st[q.cell], d = JL.done.has(q.id); s.tot += q.len; if(d) s.mkn += q.len;
-    if(q.kat === 'B' || q.kat === 'Q'){ s.bL += q.len; if(d) s.bC += q.len; } else if(q.kat === 'M'){ s.mL += q.len; if(d) s.mC += q.len; }
+    if(kat === 'B' || kat === 'Q'){ s.bL += q.len; if(d) s.bC += q.len; } else if(kat === 'M'){ s.mL += q.len; if(d) s.mC += q.len; }
   });
   ck[key] = {v: JL.ver, st: st};
   return st;
