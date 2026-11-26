@@ -6,7 +6,7 @@
    ============================================================ */
 const SUPABASE_URL = 'https://bgvdrinvblanlaykydit.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_EMHLQqIuGbFaCBUYkV5yVw_X_yR_aKZ';
-const APP_VERSI = '1.2.11';
+const APP_VERSI = '1.2.12';
 const S = 0.01;       // ukuran petak (derajat)
 const GRID_N = 4;     // 4x4 = 16 kotak per petak
 const NAMA_PRIO = ['-', 'A', 'B', 'C'];
@@ -94,8 +94,19 @@ function namaBersih(n){
   return s.toLowerCase().replace(/(^|[\s.'-])([a-z])/g, (m, a, b) => a + b.toUpperCase());
 }
 /* RBM/BM/ASS = mode LIHAT (tanpa perekaman GPS, melihat seluruh toko & petak pilot depo). RBM/BM bisa pindah depo sesuai MANAJER di config.js. */
-let mgrSales = '';
-function peranSesi(){ return sesi ? peranNama(sesi.nama) : ''; }
+let mgrSales = '', mgrDipilih = false, mgrPetakSaya = 0;   // v26: mgrSales '__saya__' = ASS/BM/RBM kerja di petaknya sendiri (perilaku = sales)
+function peranAsli(){ return sesi ? peranNama(sesi.nama) : ''; }
+function peranSesi(){ return (sesi && mgrSales !== '__saya__') ? peranNama(sesi.nama) : ''; }   // '' saat mode kerja -> semua alur sales berlaku
+function mgrReset(){ mgrSales = ''; mgrDipilih = false; mgrPetakSaya = 0; }
+/* v26: hitung petak yang ditugaskan ke akun manajer ini sendiri (dari dashboard). Kalau ada & belum memilih -> langsung mode kerja. */
+async function mgrCekPetakSaya(bolehPindah){
+  if(!sesi || !peranAsli()) return 0;
+  let t = null;
+  try{ t = await rpc('sales_tugas', {p_kode: sesi.kode}); if(t && t.ok) lsSet('sl2_tugas_' + sesi.kode, t); }catch(e){ t = lsGet('sl2_tugas_' + sesi.kode, null); }
+  mgrPetakSaya = (t && t.ok) ? ((t.petak || []).length + (t.area_manual || []).length) : 0;
+  if(bolehPindah && mgrPetakSaya > 0 && !mgrDipilih) mgrSales = '__saya__';
+  return mgrPetakSaya;
+}
 function depotManajer(){ const m = (typeof MANAJER !== 'undefined' && sesi) ? MANAJER[sesi.kode] : null; return m ? m.depot : (sesi ? [sesi.depot] : []); }
 function peranNama(n){ const m = /^(RBM|BM|ASS)\b\s*-/i.exec(String(n || '').trim()); return m ? m[1].toUpperCase() : ''; }
 function namaDepan(n){ const b = namaBersih(n).split(/\s+/); return (b[0] && b[0].length <= 2 && b[1]) ? b[0] + ' ' + b[1] : (b[0] || ''); }
@@ -472,7 +483,7 @@ async function masuk(){
       else { toast('Server bermasalah: ' + e.message, 4500); return; }
     }
     if(!j || !j.ok){ toast((j && j.error) || 'Kode sales belum terdaftar di server. Hubungi admin.', 4200); return; }
-    sesi = {kode: kode, nama: nama, depot: depotAktif};
+    sesi = {kode: kode, nama: nama, depot: depotAktif}; mgrReset();
     if(kode === TESTER_KODE){ const pilih = await pilihSalesTester(); if(pilih) sesi = pilih; }
     lsSet('sl2_sesi', sesi);
     await siapkan();
@@ -503,7 +514,7 @@ async function keluar(){
     ok: 'Keluar', batal: 'Batal'});
   if(!ok) return;
   try{ nat().kirimSekarang(); nat().berhenti(); }catch(e){}
-  stopPoll(); sesi = null; lsDel('sl2_sesi');
+  stopPoll(); sesi = null; lsDel('sl2_sesi'); mgrReset();
   zonaAktif = null; trailPoints = []; lastSaved = null; lastPos = null; lastSeq = 0; zonaList = []; manualList = []; zonaState = {mode: 'memuat', pesan: ''};
   if(map){ map.remove(); map = null; }
   if(mapAll){ mapAll.remove(); mapAll = null; allLayers = []; allMe = null; }
@@ -526,6 +537,7 @@ async function siapkan(){
   const hm = (n) => String(Math.floor(n / 60)).padStart(2, '0') + '.' + String(n % 60).padStart(2, '0');
   const jm = inf.jam_mulai_mnt >= 0 ? (hm(inf.jam_mulai_mnt) + '–' + hm(inf.jam_selesai_mnt)) : (inf.jam_mulai >= 0 ? (hm(inf.jam_mulai * 60) + '–' + hm(inf.jam_selesai * 60)) : '24 jam');
   $('jamKerjaTxt').textContent = jm;
+  if(peranAsli() && !mgrDipilih) await mgrCekPetakSaya(true);   // v26
   const c = persetujuan();
   if(peranSesi() || (sesi && sesi.tester)){ try{ nat().berhenti(); }catch(e){} }
   else {
@@ -887,6 +899,7 @@ async function muatDaftarZona(){
   zonaState = {mode: 'memuat', pesan: ''}; segarkanLayarAktif();
   await muatDataArea(sesi.depot);
   if(peranSesi()){   // mode lihat: semua petak pilot depo
+    if(peranAsli()) mgrCekPetakSaya(false).then(() => segarkanLayarAktif()).catch(() => {});   // v26
     gridSet = new Set(); manualList = [];
     zonaList = (AREA.zona || []).filter(z => z[24] === 1);
     if(typeof jlSiapkanIndeks === 'function') jlSiapkanIndeks();
@@ -1162,31 +1175,46 @@ function zonaCardHtml(z, idx, no){
 }
 /* ---- bilah RBM/BM/ASS: pilih depo + filter sales ---- */
 function mgrBarHtml(){
-  const per = peranSesi(); if(!per) return '';
+  const per = peranAsli(); if(!per) return '';
+  const kerja = mgrSales === '__saya__';
   const deps = depotManajer();
   const cnt = {}, nm = {};
   (OUTLET || []).forEach(o => { const k = String(o[8] || ''); if(!k) return; cnt[k] = (cnt[k] || 0) + 1; nm[k] = o[9]; });
   const ks = Object.keys(cnt).sort((a, b) => namaBersih(nm[a] || a).localeCompare(namaBersih(nm[b] || b)));
-  let h = '<section class="card" style="gap:8px"><div class="row" style="justify-content:space-between"><b style="font-size:14px">Mode lihat · ' + esc(per) + '</b><span class="muted" style="font-size:12px">tanpa perekaman GPS</span></div>';
+  let h = '<section class="card" style="gap:8px"><div class="row" style="justify-content:space-between"><b style="font-size:14px">' + (kerja ? 'Mode kerja · ' : 'Mode lihat · ') + esc(per) + '</b><span class="muted" style="font-size:12px">' + (kerja ? 'petak kamu sendiri · rute terekam' : 'tanpa perekaman GPS') + '</span></div>';
   if(deps.length > 1){
     h += '<label class="muted" style="font-size:12px;font-weight:700">Depo</label><select class="mgrsel" onchange="gantiDepoMgr(this.value)">' +
       deps.map(d => '<option value="' + esc(d) + '"' + (d === sesi.depot ? ' selected' : '') + '>' + esc(d) + '</option>').join('') + '</select>';
   } else h += '<div class="muted" style="font-size:13px">Depo <b>' + esc(sesi.depot) + '</b></div>';
-  h += '<label class="muted" style="font-size:12px;font-weight:700">Sales</label><select class="mgrsel" onchange="gantiSalesMgr(this.value)"><option value="">Semua sales (' + (OUTLET || []).length + ' toko)</option>' +
+  h += '<label class="muted" style="font-size:12px;font-weight:700">Tampilkan</label><select class="mgrsel" onchange="gantiSalesMgr(this.value)">' +
+    (mgrPetakSaya > 0 || kerja ? '<option value="__saya__"' + (kerja ? ' selected' : '') + '>Petak saya (' + mgrPetakSaya + ' petak)</option>' : '') +
+    '<option value=""' + (!mgrSales ? ' selected' : '') + '>Semua sales (' + (OUTLET || []).length + ' toko)</option>' +
     ks.map(k => '<option value="' + esc(k) + '"' + (k === mgrSales ? ' selected' : '') + '>' + esc(namaBersih(nm[k] || k)) + ' (' + cnt[k] + ')</option>').join('') + '</select></section>';
   return h;
 }
 async function gantiDepoMgr(dep){
   if(!sesi || !dep || dep === sesi.depot) return;
-  sesi.depot = dep; lsSet('sl2_sesi', sesi); mgrSales = ''; depotAktif = dep;
+  if(mgrSales === '__saya__'){ try{ nat().berhenti(); }catch(e){} }
+  sesi.depot = dep; lsSet('sl2_sesi', sesi); mgrSales = ''; mgrDipilih = true; depotAktif = dep;
   zonaAktif = null; zonaList = []; manualList = [];
   await muatDaftarZona();
   if(map){ try{ map.remove(); }catch(e){} map = null; }
   if(mapAll){ try{ mapAll.remove(); }catch(e){} mapAll = null; allLayers = []; allMe = null; allSel = -1; allFirstFit = false; }
   segarkanLayarAktif();
 }
-function gantiSalesMgr(k){
-  mgrSales = k || ''; tokoAllOn = !!k || tokoAllOn;
+async function gantiSalesMgr(k){
+  const dulu = mgrSales === '__saya__';
+  mgrSales = k || ''; mgrDipilih = true;
+  if(mgrSales === '__saya__'){   // v26: kerja di petak sendiri seperti sales
+    zonaAktif = null; allSel = -1; petaSemuaPerbarui.sig = '';
+    const c = persetujuan();
+    if(!c || !c.setuju){ tampil('scrSetuju'); return; }   // setelah setuju -> siapkan() -> rekam + muat petak
+    if(!infoNative().lokasi) bukaSetelan(true); else mulaiTracking();
+    await muatDaftarZona();
+    return;
+  }
+  if(dulu){ try{ nat().kirimSekarang(); nat().berhenti(); }catch(e){} gridSet = new Set(); manualList = []; zonaAktif = null; }
+  tokoAllOn = !!k || tokoAllOn;
   /* pilih sales -> petak yang tampil = petak milik sales itu (sama dengan yang dilihat sales); "Semua sales" -> petak pilot depo */
   try{ zonaList = mgrSales ? petakOtomatis(mgrSales) : (AREA.zona || []).filter(z => z[24] === 1); }catch(e){}
   allSel = -1; petaSemuaPerbarui.sig = ''; if(typeof jlSiapkanIndeks === 'function') jlSiapkanIndeks();
